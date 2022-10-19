@@ -10,6 +10,7 @@ pub enum TokenType {
     Space,
     Newline,
     Comma,
+    String,
     Dot,
     Dollar,
     Pipe,
@@ -42,7 +43,7 @@ pub struct Token<'a> {
 fn is_symbol(b: u8) -> bool {
     [
         b'+', b'-', b'*', b'/', b'.', b',', b'(', b'[', b'{', b'<', b')', b']', b'}', b'>', b':',
-        b';', b'=', b'$',
+        b';', b'=', b'$', b'|',
     ]
     .contains(&b)
 }
@@ -53,6 +54,30 @@ impl<'a> Lexer<'a> {
             source,
             span_offset,
         }
+    }
+
+    pub fn lex_quoted_string(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+        let mut token_offset = 1;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] == b'"' {
+                token_offset += 1;
+                break;
+            }
+            token_offset += 1;
+        }
+
+        self.span_offset += token_offset;
+
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::String,
+            contents,
+            span_start,
+            span_end: self.span_offset,
+        })
     }
 
     pub fn lex_number(&mut self) -> Option<Token<'a>> {
@@ -282,6 +307,8 @@ impl<'a> Iterator for Lexer<'a> {
             None
         } else if self.source[0].is_ascii_digit() {
             self.lex_number()
+        } else if self.source[0] == b'"' {
+            self.lex_quoted_string()
         } else if self.source[0] == b' ' || self.source[0] == b'\t' || self.source[0] == b'\r' {
             self.lex_space()
         } else if is_symbol(self.source[0]) {
