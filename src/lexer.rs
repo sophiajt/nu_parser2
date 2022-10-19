@@ -11,6 +11,7 @@ pub enum TokenType {
     Newline,
     Comma,
     Dot,
+    Dollar,
     Colon,
     Semicolon,
     PlusSign,
@@ -40,7 +41,7 @@ pub struct Token<'a> {
 fn is_symbol(b: u8) -> bool {
     [
         b'+', b'-', b'*', b'/', b'.', b',', b'(', b'[', b'{', b'<', b')', b']', b'}', b'>', b':',
-        b';', b'=',
+        b';', b'=', b'$',
     ]
     .contains(&b)
 }
@@ -212,6 +213,12 @@ impl<'a> Lexer<'a> {
             },
             b'.' => Token {
                 token_type: TokenType::Dot,
+                contents: &self.source[..1],
+                span_start,
+                span_end: span_start + 1,
+            },
+            b'$' => Token {
+                token_type: TokenType::Dollar,
                 contents: &self.source[..1],
                 span_start,
                 span_end: span_start + 1,
