@@ -738,7 +738,7 @@ impl<'a> Parser<'a> {
 }
 
 fn main() {
-    let source = b"def foo [x: int] {
+    let source = b"def foo(x: int) {
         let x = 3
     }";
     // let source = b"301 203";
