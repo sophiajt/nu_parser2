@@ -12,10 +12,12 @@ use std::iter::Peekable;
 enum NodeType {
     Int,
     Variable,
+    VariableDecl(NodeId, NodeId),
+    Block(Vec<NodeId>),
     Garbage,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NodeId(usize);
 
 #[derive(Debug)]
@@ -37,16 +39,19 @@ impl ParserDelta {
     }
 }
 
+#[derive(Debug)]
 pub struct Span {
     start: usize,
     end: usize,
 }
 
+#[derive(Debug)]
 pub enum ParseErrorType {
     UnexpectedToken,
     Expected(String),
 }
 
+#[derive(Debug)]
 pub struct ParseError {
     error_type: ParseErrorType,
     span: Span,
@@ -71,25 +76,50 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) {
-        self.skip_whitespace();
-
-        self.statement_or_definition();
+        self.code();
     }
 
-    pub fn statement_or_definition(&mut self) {
+    pub fn statement_or_definition(&mut self) -> NodeId {
         if self.is_keyword(b"def") {
-            self.definition();
+            self.definition()
         } else {
-            self.statement();
+            self.statement()
         }
     }
 
-    pub fn statement(&mut self) {
+    pub fn statement(&mut self) -> NodeId {
         if self.is_keyword(b"let") {
-            self.let_statement();
+            self.let_statement()
         } else {
-            self.number();
+            self.number()
         }
+    }
+
+    pub fn has_tokens(&mut self) -> bool {
+        self.lexer.peek().is_some()
+    }
+
+    pub fn is_rcurly(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::RCurly,
+                ..
+            })
+        )
+    }
+
+    pub fn is_whitespace(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::Space,
+                ..
+            }) | Some(Token {
+                token_type: TokenType::Newline,
+                ..
+            })
+        )
     }
 
     pub fn is_number(&mut self) -> bool {
@@ -113,6 +143,22 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn code(&mut self) -> NodeId {
+        let mut code_body = vec![];
+        while self.has_tokens() {
+            if self.is_whitespace() {
+                self.skip_whitespace();
+            } else if self.is_rcurly() {
+                break;
+            } else {
+                let result = self.statement_or_definition();
+                code_body.push(result);
+            }
+        }
+
+        self.create_node(NodeType::Block(code_body), 0, 0)
+    }
+
     pub fn keyword(&mut self, keyword: &[u8]) {
         match self.lexer.next() {
             Some(Token {
@@ -128,37 +174,50 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn symbol(&mut self, symbol: &[u8]) {
+    pub fn equals(&mut self) {
         match self.lexer.next() {
             Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
+                token_type: TokenType::Equals,
                 ..
-            }) if contents == symbol => {}
+            }) => {}
             _ => {
-                self.error(ParseErrorType::Expected(
-                    String::from_utf8_lossy(symbol).to_string(),
-                ));
+                self.error(ParseErrorType::Expected("equals (=)".to_string()));
             }
         }
     }
 
-    pub fn definition(&mut self) {
+    pub fn definition(&mut self) -> NodeId {
         self.keyword(b"def");
+        let definition_name = self.variable_name();
+
+        definition_name
     }
 
-    pub fn let_statement(&mut self) {
+    pub fn span_start(&self, node_id: NodeId) -> usize {
+        self.delta.span_start[node_id.0]
+    }
+
+    pub fn span_end(&self, node_id: NodeId) -> usize {
+        self.delta.span_end[node_id.0]
+    }
+
+    pub fn let_statement(&mut self) -> NodeId {
         self.keyword(b"let");
         self.skip_whitespace();
-        let variable_node_id = self.variable_name();
+        let variable_node = self.variable_name();
         self.skip_whitespace();
-        self.symbol(b"=");
+        self.equals();
         self.skip_whitespace();
-        let init_node_id = self.number();
-        println!("var: {:?} init: {:?}", variable_node_id, init_node_id);
+        let initializer_node = self.number();
+
+        self.create_node(
+            NodeType::VariableDecl(variable_node, initializer_node),
+            self.span_start(variable_node),
+            self.span_end(variable_node),
+        )
     }
 
-    pub fn variable_name(&mut self) -> Option<NodeId> {
+    pub fn variable_name(&mut self) -> NodeId {
         // TODO: add support for `$` in front of variable name
 
         match self.lexer.next() {
@@ -167,11 +226,8 @@ impl<'a> Parser<'a> {
                 span_start,
                 span_end,
                 ..
-            }) => Some(self.create_node(NodeType::Variable, span_start, span_end)),
-            _ => {
-                self.error(ParseErrorType::Expected("variable name".to_string()));
-                None
-            }
+            }) => self.create_node(NodeType::Variable, span_start, span_end),
+            _ => self.error(ParseErrorType::Expected("variable name".to_string())),
         }
     }
 
@@ -187,7 +243,7 @@ impl<'a> Parser<'a> {
 
                 self.create_node(NodeType::Int, span_start, span_end)
             }
-            _ => panic!("TODO: add errors"),
+            _ => self.error(ParseErrorType::Expected("number".to_string())),
         }
     }
 
@@ -201,10 +257,10 @@ impl<'a> Parser<'a> {
         self.delta.span_end.push(span_end);
         self.delta.node_types.push(node_type);
 
-        NodeId(self.delta.span_start.len() + self.delta.node_id_offset)
+        NodeId(self.delta.span_start.len() - 1 + self.delta.node_id_offset)
     }
 
-    pub fn error(&mut self, error_type: ParseErrorType) {
+    pub fn error(&mut self, error_type: ParseErrorType) -> NodeId {
         if let Some(Token {
             span_start,
             span_end,
@@ -217,7 +273,8 @@ impl<'a> Parser<'a> {
                     start: span_start,
                     end: span_end,
                 },
-            })
+            });
+            self.create_node(NodeType::Garbage, span_start, span_end)
         } else {
             self.errors.push(ParseError {
                 error_type,
@@ -225,7 +282,8 @@ impl<'a> Parser<'a> {
                     start: self.content_length,
                     end: self.content_length,
                 },
-            })
+            });
+            self.create_node(NodeType::Garbage, self.content_length, self.content_length)
         }
     }
 
@@ -240,8 +298,8 @@ impl<'a> Parser<'a> {
                     token_type: TokenType::Newline,
                     ..
                 }) => {
-                    self.lexer.next();
                     // keep going
+                    self.lexer.next();
                 }
                 _ => return,
             }
@@ -249,24 +307,24 @@ impl<'a> Parser<'a> {
     }
 }
 
-pub fn parse(source: &[u8], span_offset: usize) -> ParserDelta {
-    let mut parser = Parser::new(source, span_offset, 0);
-
-    parser.parse();
-
-    parser.delta
-}
-
 fn main() {
     // let source = b"def foo(x: int) {
     //     let x = 3 + 4
     // }";
     // let source = b"301 203";
-    let source = b"let x = 3";
+    let source = b"
+        let x = 3
+        let y = 403
+    ";
 
     let span_offset = 0;
 
-    let result = parse(source, span_offset);
+    let mut parser = Parser::new(source, span_offset, 0);
 
-    println!("Result: {:?}", result)
+    parser.parse();
+
+    let result = parser.delta;
+
+    println!("Result: {:?}", result);
+    println!("Errors: {:?}", parser.errors);
 }
