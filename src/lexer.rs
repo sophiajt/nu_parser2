@@ -12,6 +12,7 @@ pub enum TokenType {
     Comma,
     Dot,
     Dollar,
+    Pipe,
     Colon,
     Semicolon,
     PlusSign,
@@ -219,6 +220,12 @@ impl<'a> Lexer<'a> {
             },
             b'$' => Token {
                 token_type: TokenType::Dollar,
+                contents: &self.source[..1],
+                span_start,
+                span_end: span_start + 1,
+            },
+            b'|' => Token {
+                token_type: TokenType::Pipe,
                 contents: &self.source[..1],
                 span_start,
                 span_end: span_start + 1,
