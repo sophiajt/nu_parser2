@@ -66,6 +66,16 @@ pub enum NodeType {
     Garbage,
 }
 
+impl NodeType {
+    pub fn precedence(&self) -> usize {
+        match self {
+            NodeType::Multiply | NodeType::Divide => 95,
+            NodeType::Plus | NodeType::Minus => 90,
+            _ => 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct NodeId(usize);
 
@@ -434,20 +444,60 @@ impl<'a> Parser<'a> {
     pub fn expression(&mut self) -> NodeId {
         let mut expr_stack = vec![];
 
+        let mut last_prec = 1000000;
+
         let lhs = self.simple_expression();
 
         expr_stack.push(lhs);
 
         while self.has_tokens() {
             self.skip_space();
-            println!("token: {:?}", self.lexer.peek());
             if self.is_operator() {
                 let op = self.operator();
+                let op_prec = self.operator_precedence(&op);
+
                 self.skip_space();
-                let rhs = self.simple_expression();
+
+                let rhs = if self.is_simple_expression() {
+                    self.simple_expression()
+                } else {
+                    self.error(ParseErrorType::Expected(
+                        "complete math expression".to_string(),
+                    ))
+                };
+
+                while op_prec <= last_prec && expr_stack.len() > 1 {
+                    let rhs = expr_stack
+                        .pop()
+                        .expect("internal error: expression stack empty");
+                    let op = expr_stack
+                        .pop()
+                        .expect("internal error: expression stack empty");
+
+                    last_prec = self.operator_precedence(&op);
+
+                    if last_prec < op_prec {
+                        expr_stack.push(op);
+                        expr_stack.push(rhs);
+                        break;
+                    }
+
+                    let lhs = expr_stack
+                        .pop()
+                        .expect("internal error: expression stack empty");
+
+                    let (span_start, span_end) = self.spanning(&lhs, &rhs);
+                    expr_stack.push(self.create_node(
+                        NodeType::BinaryOp { lhs, op, rhs },
+                        span_start,
+                        span_end,
+                    ))
+                }
 
                 expr_stack.push(op);
                 expr_stack.push(rhs);
+
+                last_prec = op_prec;
             } else {
                 break;
             }
@@ -464,8 +514,7 @@ impl<'a> Parser<'a> {
                 .pop()
                 .expect("internal error: expression stack empty");
 
-            let span_start = self.delta.span_start[lhs.0];
-            let span_end = self.delta.span_end[rhs.0];
+            let (span_start, span_end) = self.spanning(&lhs, &rhs);
 
             expr_stack.push(self.create_node(
                 NodeType::BinaryOp { lhs, op, rhs },
@@ -541,6 +590,14 @@ impl<'a> Parser<'a> {
             }
             _ => self.error(ParseErrorType::Expected("operator".to_string())),
         }
+    }
+
+    pub fn operator_precedence(&mut self, operator: &NodeId) -> usize {
+        self.delta.node_types[operator.0].precedence()
+    }
+
+    pub fn spanning(&mut self, from: &NodeId, to: &NodeId) -> (usize, usize) {
+        (self.delta.span_start[from.0], self.delta.span_end[to.0])
     }
 
     pub fn block(&mut self) -> NodeId {
