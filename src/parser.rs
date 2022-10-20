@@ -13,6 +13,10 @@ pub enum NodeType {
     NamedArg,
     True,
     False,
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
     Let {
         variable_name: NodeId,
         initializer: NodeId,
@@ -51,6 +55,11 @@ pub enum NodeType {
     Redirection {
         from: NodeId,
         to: NodeId,
+    },
+    BinaryOp {
+        lhs: NodeId,
+        op: NodeId,
+        rhs: NodeId,
     },
     List(Vec<NodeId>),
     Block(Vec<NodeId>),
@@ -125,6 +134,30 @@ impl ParserDelta {
             NodeType::False => {
                 println!(
                     "False ({}, {})",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+            }
+            NodeType::Plus => {
+                println!(
+                    "Plus ({}, {})",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+            }
+            NodeType::Minus => {
+                println!(
+                    "Minus ({}, {})",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+            }
+            NodeType::Multiply => {
+                println!(
+                    "Multiply ({}, {})",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+            }
+            NodeType::Divide => {
+                println!(
+                    "Divide ({}, {})",
                     self.span_start[node_id.0], self.span_end[node_id.0],
                 );
             }
@@ -278,6 +311,16 @@ impl ParserDelta {
                 self.print_helper(from, indent + 2);
                 self.print_helper(to, indent + 2)
             }
+            NodeType::BinaryOp { lhs, op, rhs } => {
+                println!(
+                    "BinaryOp ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(lhs, indent + 2);
+                self.print_helper(op, indent + 2);
+                self.print_helper(rhs, indent + 2)
+            }
             NodeType::Garbage => {
                 println!(
                     "Garbage ({}, {})",
@@ -374,7 +417,7 @@ impl<'a> Parser<'a> {
         } else if self.is_keyword(b"mut") {
             self.mut_statement()
         } else if self.is_simple_expression() {
-            self.simple_expression()
+            self.expression()
         } else {
             self.pipeline()
         }
@@ -382,10 +425,58 @@ impl<'a> Parser<'a> {
 
     pub fn expression_or_pipeline(&mut self) -> NodeId {
         if self.is_simple_expression() {
-            self.simple_expression()
+            self.expression()
         } else {
             self.pipeline()
         }
+    }
+
+    pub fn expression(&mut self) -> NodeId {
+        let mut expr_stack = vec![];
+
+        let lhs = self.simple_expression();
+
+        expr_stack.push(lhs);
+
+        while self.has_tokens() {
+            self.skip_space();
+            println!("token: {:?}", self.lexer.peek());
+            if self.is_operator() {
+                let op = self.operator();
+                self.skip_space();
+                let rhs = self.simple_expression();
+
+                expr_stack.push(op);
+                expr_stack.push(rhs);
+            } else {
+                break;
+            }
+        }
+
+        while expr_stack.len() > 1 {
+            let rhs = expr_stack
+                .pop()
+                .expect("internal error: expression stack empty");
+            let op = expr_stack
+                .pop()
+                .expect("internal error: expression stack empty");
+            let lhs = expr_stack
+                .pop()
+                .expect("internal error: expression stack empty");
+
+            let span_start = self.delta.span_start[lhs.0];
+            let span_end = self.delta.span_end[rhs.0];
+
+            expr_stack.push(self.create_node(
+                NodeType::BinaryOp { lhs, op, rhs },
+                span_start,
+                span_end,
+            ))
+        }
+
+        expr_stack
+            .pop()
+            .expect("internal error: expression stack empty")
     }
 
     pub fn simple_expression(&mut self) -> NodeId {
@@ -399,6 +490,56 @@ impl<'a> Parser<'a> {
             self.string()
         } else {
             self.number()
+        }
+    }
+
+    pub fn operator(&mut self) -> NodeId {
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::PlusSign,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+                self.lexer.next();
+                self.create_node(NodeType::Plus, span_start, span_end)
+            }
+            Some(Token {
+                token_type: TokenType::Dash,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+                self.lexer.next();
+                self.create_node(NodeType::Minus, span_start, span_end)
+            }
+            Some(Token {
+                token_type: TokenType::Asterisk,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+                self.lexer.next();
+                self.create_node(NodeType::Multiply, span_start, span_end)
+            }
+            Some(Token {
+                token_type: TokenType::ForwardSlash,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+                self.lexer.next();
+                self.create_node(NodeType::Divide, span_start, span_end)
+            }
+            _ => self.error(ParseErrorType::Expected("operator".to_string())),
         }
     }
 
@@ -902,6 +1043,28 @@ impl<'a> Parser<'a> {
                 ..
             })
         )
+    }
+
+    pub fn is_operator(&mut self) -> bool {
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::PlusSign,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::Dash,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::Asterisk,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::ForwardSlash,
+                ..
+            }) => true,
+            _ => false,
+        }
     }
 
     pub fn is_comma(&mut self) -> bool {
