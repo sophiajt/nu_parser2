@@ -9,14 +9,45 @@ pub enum NodeType {
     Name,
     Bareword,
     Variable,
+
+    // Command-specific
     Flag,
     NamedArg,
+
+    // Booleans
     True,
     False,
+
+    // Operators
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    RegexMatch,
+    NotRegexMatch,
     Plus,
+    Append,
     Minus,
     Multiply,
     Divide,
+    In,
+    NotIn,
+    Modulo,
+    FloorDivision,
+    And,
+    Or,
+    Pow,
+    BitOr,
+    BitXor,
+    BitAnd,
+    ShiftLeft,
+    ShiftRight,
+    StartsWith,
+    EndsWith,
+
+    // Statements
     Let {
         variable_name: NodeId,
         initializer: NodeId,
@@ -29,6 +60,8 @@ pub enum NodeType {
         variable_name: NodeId,
         initializer: NodeId,
     },
+
+    // Definitions
     Def {
         name: NodeId,
         params: NodeId,
@@ -44,17 +77,11 @@ pub enum NodeType {
         name: NodeId,
         ty: Option<NodeId>,
     },
+
+    // Expressions
     Call {
         head: NodeId,
         args: Vec<NodeId>,
-    },
-    Pipeline {
-        from: NodeId,
-        to: NodeId,
-    },
-    Redirection {
-        from: NodeId,
-        to: NodeId,
     },
     BinaryOp {
         lhs: NodeId,
@@ -63,14 +90,47 @@ pub enum NodeType {
     },
     List(Vec<NodeId>),
     Block(Vec<NodeId>),
+
+    // Shell-specific
+    Pipeline {
+        from: NodeId,
+        to: NodeId,
+    },
+    Redirection {
+        from: NodeId,
+        to: NodeId,
+    },
+
     Garbage,
 }
 
 impl NodeType {
     pub fn precedence(&self) -> usize {
         match self {
-            NodeType::Multiply | NodeType::Divide => 95,
+            NodeType::Pow => 100,
+            NodeType::Multiply | NodeType::Divide | NodeType::Modulo | NodeType::FloorDivision => {
+                95
+            }
             NodeType::Plus | NodeType::Minus => 90,
+            NodeType::ShiftLeft | NodeType::ShiftRight => 85,
+            NodeType::NotRegexMatch
+            | NodeType::RegexMatch
+            | NodeType::StartsWith
+            | NodeType::EndsWith
+            | NodeType::LessThan
+            | NodeType::LessThanOrEqual
+            | NodeType::GreaterThan
+            | NodeType::GreaterThanOrEqual
+            | NodeType::Equal
+            | NodeType::NotEqual
+            | NodeType::In
+            | NodeType::NotIn
+            | NodeType::Append => 80,
+            NodeType::BitAnd => 75,
+            NodeType::BitXor => 70,
+            NodeType::BitOr => 60,
+            NodeType::And => 50,
+            NodeType::Or => 40,
             _ => 0,
         }
     }
@@ -111,84 +171,6 @@ impl ParserDelta {
         }
 
         match &self.node_types[node_id.0] {
-            NodeType::Int => {
-                println!(
-                    "Int ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::String => {
-                println!(
-                    "String ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Bareword => {
-                println!(
-                    "Bareword ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Variable => {
-                println!(
-                    "Variable ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::True => {
-                println!(
-                    "True ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::False => {
-                println!(
-                    "False ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Plus => {
-                println!(
-                    "Plus ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Minus => {
-                println!(
-                    "Minus ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Multiply => {
-                println!(
-                    "Multiply ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Divide => {
-                println!(
-                    "Divide ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Name => {
-                println!(
-                    "Name ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::Flag => {
-                println!(
-                    "Flag ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
-            NodeType::NamedArg => {
-                println!(
-                    "NamedArg ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
-            }
             NodeType::Let {
                 variable_name,
                 initializer,
@@ -331,11 +313,11 @@ impl ParserDelta {
                 self.print_helper(op, indent + 2);
                 self.print_helper(rhs, indent + 2)
             }
-            NodeType::Garbage => {
+            x => {
                 println!(
-                    "Garbage ({}, {})",
-                    self.span_start[node_id.0], self.span_end[node_id.0],
-                );
+                    "{:?} ({}, {})",
+                    x, self.span_start[node_id.0], self.span_end[node_id.0]
+                )
             }
         }
     }
