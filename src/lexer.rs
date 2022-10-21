@@ -16,6 +16,7 @@ pub enum TokenType {
     Dollar,
     Variable,
     Pipe,
+    PipePipe,
     Colon,
     Semicolon,
     Plus,
@@ -41,6 +42,8 @@ pub enum TokenType {
     RCurly,
     GreaterThan,
     GreaterThanEqual,
+    Ampersand,
+    AmpersandAmpersand,
     Bareword,
 }
 
@@ -55,7 +58,7 @@ pub struct Token<'a> {
 fn is_symbol(b: u8) -> bool {
     [
         b'+', b'-', b'*', b'/', b'.', b',', b'(', b'[', b'{', b'<', b')', b']', b'}', b'>', b':',
-        b';', b'=', b'$', b'|', b'!', b'~',
+        b';', b'=', b'$', b'|', b'!', b'~', b'&',
     ]
     .contains(&b)
 }
@@ -394,12 +397,40 @@ impl<'a> Lexer<'a> {
                 span_start,
                 span_end: span_start + 1,
             },
-            b'|' => Token {
-                token_type: TokenType::Pipe,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
+            b'|' => {
+                if self.source.len() > 1 && self.source[1] == b'|' {
+                    Token {
+                        token_type: TokenType::PipePipe,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Pipe,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
+            b'&' => {
+                if self.source.len() > 1 && self.source[1] == b'&' {
+                    Token {
+                        token_type: TokenType::AmpersandAmpersand,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Ampersand,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
             b',' => Token {
                 token_type: TokenType::Comma,
                 contents: &self.source[..1],

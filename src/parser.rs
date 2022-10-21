@@ -100,7 +100,14 @@ pub enum NodeType {
         from: NodeId,
         to: NodeId,
     },
-
+    BashAnd {
+        lhs: NodeId,
+        rhs: NodeId,
+    },
+    BashOr {
+        lhs: NodeId,
+        rhs: NodeId,
+    },
     Garbage,
 }
 
@@ -325,7 +332,6 @@ impl ParserDelta {
 
 #[derive(Debug)]
 pub enum ParseErrorType {
-    UnexpectedToken,
     Expected(String),
 }
 
@@ -637,6 +643,15 @@ impl<'a> Parser<'a> {
                         } else if contents == b"ends-with" {
                             self.lexer.next();
                             self.create_node(NodeType::EndsWith, span_start, span_end)
+                        } else if contents == b"and" {
+                            self.lexer.next();
+                            self.create_node(NodeType::And, span_start, span_end)
+                        } else if contents == b"or" {
+                            self.lexer.next();
+                            self.create_node(NodeType::Or, span_start, span_end)
+                        } else if contents == b"mod" {
+                            self.lexer.next();
+                            self.create_node(NodeType::Modulo, span_start, span_end)
                         } else {
                             self.error(ParseErrorType::Expected("operator".to_string()))
                         }
@@ -845,6 +860,20 @@ impl<'a> Parser<'a> {
                 let span_end = self.position();
 
                 from = self.create_node(NodeType::Redirection { from, to }, span_start, span_end)
+            } else if self.is_double_ampersand() {
+                self.lexer.next();
+                self.skip_space();
+                let rhs = self.call();
+                let span_end = self.position();
+
+                from = self.create_node(NodeType::BashAnd { lhs: from, rhs }, span_start, span_end)
+            } else if self.is_double_pipe() {
+                self.lexer.next();
+                self.skip_space();
+                let rhs = self.call();
+                let span_end = self.position();
+
+                from = self.create_node(NodeType::BashOr { lhs: from, rhs }, span_start, span_end)
             } else if self.is_rparen() || self.is_newline() || self.is_rcurly() {
                 break;
             } else {
@@ -888,7 +917,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::Bareword, span_start, span_end)
             }
-            x => self.error(ParseErrorType::Expected("bare word".to_string())),
+            _ => self.error(ParseErrorType::Expected("bare word".to_string())),
         }
     }
 
@@ -955,6 +984,8 @@ impl<'a> Parser<'a> {
                 || self.is_rcurly()
                 || self.is_newline()
                 || self.is_greater_than()
+                || self.is_double_ampersand()
+                || self.is_double_pipe()
             {
                 break;
             }
@@ -1165,6 +1196,9 @@ impl<'a> Parser<'a> {
                 TokenType::Bareword if contents == b"bit-and" => true,
                 TokenType::Bareword if contents == b"bit-shl" => true,
                 TokenType::Bareword if contents == b"bit-shr" => true,
+                TokenType::Bareword if contents == b"and" => true,
+                TokenType::Bareword if contents == b"or" => true,
+                TokenType::Bareword if contents == b"mod" => true,
 
                 _ => false,
             },
@@ -1267,6 +1301,26 @@ impl<'a> Parser<'a> {
             self.lexer.peek(),
             Some(Token {
                 token_type: TokenType::Pipe,
+                ..
+            })
+        )
+    }
+
+    pub fn is_double_pipe(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::PipePipe,
+                ..
+            })
+        )
+    }
+
+    pub fn is_double_ampersand(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::AmpersandAmpersand,
                 ..
             })
         )
