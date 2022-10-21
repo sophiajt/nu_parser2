@@ -1,7 +1,5 @@
 use crate::lexer::{Lexer, Token, TokenType};
 
-use std::iter::Peekable;
-
 #[derive(Debug)]
 pub enum NodeType {
     Int,
@@ -390,7 +388,7 @@ pub struct ParseError {
 
 pub struct Parser<'a> {
     pub delta: ParserDelta,
-    lexer: Peekable<Lexer<'a>>,
+    lexer: Lexer<'a>,
     pub errors: Vec<ParseError>,
     content_length: usize,
 }
@@ -400,7 +398,7 @@ impl<'a> Parser<'a> {
         let content_length = source.len();
         Self {
             delta: ParserDelta::new(node_id_offset),
-            lexer: Lexer::new(source, span_offset).peekable(),
+            lexer: Lexer::new(source, span_offset),
             errors: vec![],
             content_length,
         }
@@ -408,7 +406,7 @@ impl<'a> Parser<'a> {
 
     fn position(&mut self) -> usize {
         if let Some(Token { span_start, .. }) = self.lexer.peek() {
-            *span_start
+            span_start
         } else {
             self.content_length
         }
@@ -615,123 +613,118 @@ impl<'a> Parser<'a> {
                 contents,
                 span_start,
                 span_end,
-            }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
-                match token_type {
-                    TokenType::Plus => {
+            }) => match token_type {
+                TokenType::Plus => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Plus, span_start, span_end)
+                }
+                TokenType::PlusPlus => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Append, span_start, span_end)
+                }
+                TokenType::Dash => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Minus, span_start, span_end)
+                }
+                TokenType::Asterisk => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Multiply, span_start, span_end)
+                }
+                TokenType::ForwardSlash => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Divide, span_start, span_end)
+                }
+                TokenType::ForwardSlashForwardSlash => {
+                    self.lexer.next();
+                    self.create_node(NodeType::FloorDivision, span_start, span_end)
+                }
+                TokenType::LessThan => {
+                    self.lexer.next();
+                    self.create_node(NodeType::LessThan, span_start, span_end)
+                }
+                TokenType::LessThanEqual => {
+                    self.lexer.next();
+                    self.create_node(NodeType::LessThanOrEqual, span_start, span_end)
+                }
+                TokenType::GreaterThan => {
+                    self.lexer.next();
+                    self.create_node(NodeType::GreaterThan, span_start, span_end)
+                }
+                TokenType::GreaterThanEqual => {
+                    self.lexer.next();
+                    self.create_node(NodeType::GreaterThanOrEqual, span_start, span_end)
+                }
+                TokenType::EqualsEquals => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Equal, span_start, span_end)
+                }
+                TokenType::ExclamationEquals => {
+                    self.lexer.next();
+                    self.create_node(NodeType::NotEqual, span_start, span_end)
+                }
+                TokenType::AsteriskAsterisk => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Pow, span_start, span_end)
+                }
+                TokenType::EqualsTilde => {
+                    self.lexer.next();
+                    self.create_node(NodeType::RegexMatch, span_start, span_end)
+                }
+                TokenType::ExclamationTilde => {
+                    self.lexer.next();
+                    self.create_node(NodeType::NotRegexMatch, span_start, span_end)
+                }
+                TokenType::AmpersandAmpersand => {
+                    self.lexer.next();
+                    self.create_node(NodeType::And, span_start, span_end)
+                }
+                TokenType::PipePipe => {
+                    self.lexer.next();
+                    self.create_node(NodeType::Or, span_start, span_end)
+                }
+                TokenType::Bareword => {
+                    if contents == b"in" {
                         self.lexer.next();
-                        self.create_node(NodeType::Plus, span_start, span_end)
-                    }
-                    TokenType::PlusPlus => {
+                        self.create_node(NodeType::In, span_start, span_end)
+                    } else if contents == b"not-in" {
                         self.lexer.next();
-                        self.create_node(NodeType::Append, span_start, span_end)
-                    }
-                    TokenType::Dash => {
+                        self.create_node(NodeType::NotIn, span_start, span_end)
+                    } else if contents == b"bit-or" {
                         self.lexer.next();
-                        self.create_node(NodeType::Minus, span_start, span_end)
-                    }
-                    TokenType::Asterisk => {
+                        self.create_node(NodeType::BitOr, span_start, span_end)
+                    } else if contents == b"bit-and" {
                         self.lexer.next();
-                        self.create_node(NodeType::Multiply, span_start, span_end)
-                    }
-                    TokenType::ForwardSlash => {
+                        self.create_node(NodeType::BitAnd, span_start, span_end)
+                    } else if contents == b"bit-xor" {
                         self.lexer.next();
-                        self.create_node(NodeType::Divide, span_start, span_end)
-                    }
-                    TokenType::ForwardSlashForwardSlash => {
+                        self.create_node(NodeType::BitXor, span_start, span_end)
+                    } else if contents == b"bit-shl" {
                         self.lexer.next();
-                        self.create_node(NodeType::FloorDivision, span_start, span_end)
-                    }
-                    TokenType::LessThan => {
+                        self.create_node(NodeType::ShiftLeft, span_start, span_end)
+                    } else if contents == b"bit-shr" {
                         self.lexer.next();
-                        self.create_node(NodeType::LessThan, span_start, span_end)
-                    }
-                    TokenType::LessThanEqual => {
+                        self.create_node(NodeType::ShiftRight, span_start, span_end)
+                    } else if contents == b"starts-with" {
                         self.lexer.next();
-                        self.create_node(NodeType::LessThanOrEqual, span_start, span_end)
-                    }
-                    TokenType::GreaterThan => {
+                        self.create_node(NodeType::StartsWith, span_start, span_end)
+                    } else if contents == b"ends-with" {
                         self.lexer.next();
-                        self.create_node(NodeType::GreaterThan, span_start, span_end)
-                    }
-                    TokenType::GreaterThanEqual => {
-                        self.lexer.next();
-                        self.create_node(NodeType::GreaterThanOrEqual, span_start, span_end)
-                    }
-                    TokenType::EqualsEquals => {
-                        self.lexer.next();
-                        self.create_node(NodeType::Equal, span_start, span_end)
-                    }
-                    TokenType::ExclamationEquals => {
-                        self.lexer.next();
-                        self.create_node(NodeType::NotEqual, span_start, span_end)
-                    }
-                    TokenType::AsteriskAsterisk => {
-                        self.lexer.next();
-                        self.create_node(NodeType::Pow, span_start, span_end)
-                    }
-                    TokenType::EqualsTilde => {
-                        self.lexer.next();
-                        self.create_node(NodeType::RegexMatch, span_start, span_end)
-                    }
-                    TokenType::ExclamationTilde => {
-                        self.lexer.next();
-                        self.create_node(NodeType::NotRegexMatch, span_start, span_end)
-                    }
-                    TokenType::AmpersandAmpersand => {
+                        self.create_node(NodeType::EndsWith, span_start, span_end)
+                    } else if contents == b"and" {
                         self.lexer.next();
                         self.create_node(NodeType::And, span_start, span_end)
-                    }
-                    TokenType::PipePipe => {
+                    } else if contents == b"or" {
                         self.lexer.next();
                         self.create_node(NodeType::Or, span_start, span_end)
+                    } else if contents == b"mod" {
+                        self.lexer.next();
+                        self.create_node(NodeType::Modulo, span_start, span_end)
+                    } else {
+                        self.error(ParseErrorType::Expected("operator".to_string()))
                     }
-                    TokenType::Bareword => {
-                        if contents == b"in" {
-                            self.lexer.next();
-                            self.create_node(NodeType::In, span_start, span_end)
-                        } else if contents == b"not-in" {
-                            self.lexer.next();
-                            self.create_node(NodeType::NotIn, span_start, span_end)
-                        } else if contents == b"bit-or" {
-                            self.lexer.next();
-                            self.create_node(NodeType::BitOr, span_start, span_end)
-                        } else if contents == b"bit-and" {
-                            self.lexer.next();
-                            self.create_node(NodeType::BitAnd, span_start, span_end)
-                        } else if contents == b"bit-xor" {
-                            self.lexer.next();
-                            self.create_node(NodeType::BitXor, span_start, span_end)
-                        } else if contents == b"bit-shl" {
-                            self.lexer.next();
-                            self.create_node(NodeType::ShiftLeft, span_start, span_end)
-                        } else if contents == b"bit-shr" {
-                            self.lexer.next();
-                            self.create_node(NodeType::ShiftRight, span_start, span_end)
-                        } else if contents == b"starts-with" {
-                            self.lexer.next();
-                            self.create_node(NodeType::StartsWith, span_start, span_end)
-                        } else if contents == b"ends-with" {
-                            self.lexer.next();
-                            self.create_node(NodeType::EndsWith, span_start, span_end)
-                        } else if contents == b"and" {
-                            self.lexer.next();
-                            self.create_node(NodeType::And, span_start, span_end)
-                        } else if contents == b"or" {
-                            self.lexer.next();
-                            self.create_node(NodeType::Or, span_start, span_end)
-                        } else if contents == b"mod" {
-                            self.lexer.next();
-                            self.create_node(NodeType::Modulo, span_start, span_end)
-                        } else {
-                            self.error(ParseErrorType::Expected("operator".to_string()))
-                        }
-                    }
-                    _ => self.error(ParseErrorType::Expected("operator".to_string())),
                 }
-            }
+                _ => self.error(ParseErrorType::Expected("operator".to_string())),
+            },
             _ => self.error(ParseErrorType::Expected("operator".to_string())),
         }
     }
@@ -764,7 +757,9 @@ impl<'a> Parser<'a> {
 
         // FIXME: Add line-skipping to subexpressions
         self.lparen();
+        self.lexer.newline_is_space = true;
         let output = self.code_block(true);
+        self.lexer.newline_is_space = false;
         self.rparen();
 
         let span_end = self.position();
@@ -1048,9 +1043,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::Bareword, span_start, span_end)
             }
@@ -1119,6 +1111,7 @@ impl<'a> Parser<'a> {
             if self.is_semicolon()
                 || self.is_pipe()
                 || self.is_rcurly()
+                || self.is_rparen()
                 || self.is_newline()
                 || self.is_greater_than()
                 || self.is_double_ampersand()
@@ -1130,9 +1123,11 @@ impl<'a> Parser<'a> {
             if self.is_dash() {
                 // Flag
                 args.push(self.flag())
-            } else {
+            } else if self.is_simple_expression() {
                 // Arg
                 args.push(self.simple_expression())
+            } else {
+                args.push(self.bareword())
             }
         }
 
@@ -1169,8 +1164,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
                 self.lexer.next();
                 self.create_node(NodeType::Name, span_start, span_end)
             }
@@ -1248,7 +1241,7 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == &keyword => {
+            }) if contents == keyword => {
                 self.lexer.next();
             }
             _ => {
@@ -1555,7 +1548,7 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == &keyword
+            }) if contents == keyword
         )
     }
 
@@ -1705,9 +1698,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 contents,
             }) if contents == b"true" => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::True, span_start, span_end)
             }
@@ -1717,9 +1707,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 contents,
             }) if contents == b"false" => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::False, span_start, span_end)
             }
@@ -1735,9 +1722,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::Variable, span_start, span_end)
             }
@@ -1747,9 +1731,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::Variable, span_start, span_end)
             }
@@ -1765,9 +1746,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::Int, span_start, span_end)
             }
@@ -1783,9 +1761,6 @@ impl<'a> Parser<'a> {
                 span_end,
                 ..
             }) => {
-                let span_start = *span_start;
-                let span_end = *span_end;
-
                 self.lexer.next();
                 self.create_node(NodeType::String, span_start, span_end)
             }

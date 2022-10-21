@@ -2,6 +2,10 @@
 pub struct Lexer<'a> {
     source: &'a [u8],
     span_offset: usize,
+
+    // For times when the lexer should treat newlines
+    // as spaces
+    pub newline_is_space: bool,
 }
 
 #[derive(Debug)]
@@ -68,6 +72,7 @@ impl<'a> Lexer<'a> {
         Self {
             source,
             span_offset,
+            newline_is_space: false,
         }
     }
 
@@ -121,11 +126,13 @@ impl<'a> Lexer<'a> {
     pub fn lex_space(&mut self) -> Option<Token<'a>> {
         let span_start = self.span_offset;
         let mut token_offset = 0;
+        let whitespace: &[u8] = if self.newline_is_space {
+            &[b' ', b'\t', b'\r', b'\n']
+        } else {
+            &[b' ', b'\t', b'\r']
+        };
         while token_offset < self.source.len() {
-            if self.source[token_offset] != b' '
-                && self.source[token_offset] != b'\t'
-                && self.source[token_offset] != b'\r'
-            {
+            if !whitespace.contains(&self.source[token_offset]) {
                 break;
             }
             token_offset += 1;
@@ -479,17 +486,29 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Token<'a>;
+impl<'a> Lexer<'a> {
+    pub fn peek(&mut self) -> Option<Token<'a>> {
+        let prev_offset = self.span_offset;
+        let prev_source = self.source;
+        let output = self.next();
+        self.span_offset = prev_offset;
+        self.source = prev_source;
 
-    fn next(&mut self) -> Option<Self::Item> {
+        output
+    }
+
+    pub fn next(&mut self) -> Option<Token<'a>> {
         if self.source.is_empty() {
             None
         } else if self.source[0].is_ascii_digit() {
             self.lex_number()
         } else if self.source[0] == b'"' {
             self.lex_quoted_string()
-        } else if self.source[0] == b' ' || self.source[0] == b'\t' || self.source[0] == b'\r' {
+        } else if self.source[0] == b' '
+            || self.source[0] == b'\t'
+            || self.source[0] == b'\r'
+            || (self.newline_is_space && self.source[0] == b'\n')
+        {
             self.lex_space()
         } else if self.source[0] == b'$' {
             self.lex_variable()
