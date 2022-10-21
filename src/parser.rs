@@ -587,6 +587,12 @@ impl<'a> Parser<'a> {
                         } else if contents == b"bit-shr" {
                             self.lexer.next();
                             self.create_node(NodeType::ShiftRight, span_start, span_end)
+                        } else if contents == b"starts-with" {
+                            self.lexer.next();
+                            self.create_node(NodeType::StartsWith, span_start, span_end)
+                        } else if contents == b"ends-with" {
+                            self.lexer.next();
+                            self.create_node(NodeType::EndsWith, span_start, span_end)
                         } else {
                             self.error(ParseErrorType::Expected("operator".to_string()))
                         }
@@ -825,21 +831,21 @@ impl<'a> Parser<'a> {
     }
 
     pub fn bareword(&mut self) -> NodeId {
-        let span_start = self.position();
-        while self.has_tokens() {
-            if self.is_whitespace()
-                || self.is_pipe()
-                || self.is_rcurly()
-                || self.is_rparen()
-                || self.is_newline()
-            {
-                break;
-            }
-            self.lexer.next();
-        }
-        let span_end = self.position();
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::Bareword,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
 
-        self.create_node(NodeType::Bareword, span_start, span_end)
+                self.lexer.next();
+                self.create_node(NodeType::Bareword, span_start, span_end)
+            }
+            x => self.error(ParseErrorType::Expected("bare word".to_string())),
+        }
     }
 
     pub fn traditional_args(&mut self) -> Vec<NodeId> {
