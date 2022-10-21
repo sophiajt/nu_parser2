@@ -565,6 +565,16 @@ impl<'a> Parser<'a> {
                         self.lexer.next();
                         self.create_node(NodeType::Divide, span_start, span_end)
                     }
+                    TokenType::LAngle => {
+                        self.lexer.next();
+                        // TODO add <=
+                        self.create_node(NodeType::LessThan, span_start, span_end)
+                    }
+                    TokenType::RAngle => {
+                        self.lexer.next();
+                        // TODO add >=
+                        self.create_node(NodeType::GreaterThan, span_start, span_end)
+                    }
                     TokenType::Bareword => {
                         if contents == b"in" {
                             self.lexer.next();
