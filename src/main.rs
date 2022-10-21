@@ -4,6 +4,7 @@
 
 mod lexer;
 mod parser;
+mod parser_delta;
 
 use std::io::Read;
 

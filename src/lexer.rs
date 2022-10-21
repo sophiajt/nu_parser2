@@ -100,6 +100,30 @@ impl<'a> Lexer<'a> {
         })
     }
 
+    pub fn lex_quoted_bareword(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+        let mut token_offset = 1;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] == b'`' {
+                token_offset += 1;
+                break;
+            }
+            token_offset += 1;
+        }
+
+        self.span_offset += token_offset - 1;
+
+        let contents = &self.source[1..(token_offset - 1)];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::Bareword,
+            contents,
+            span_start: span_start + 1,
+            span_end: self.span_offset,
+        })
+    }
+
     pub fn lex_number(&mut self) -> Option<Token<'a>> {
         let span_start = self.span_offset;
         let mut token_offset = 0;
@@ -504,6 +528,8 @@ impl<'a> Lexer<'a> {
             self.lex_number()
         } else if self.source[0] == b'"' {
             self.lex_quoted_string()
+        } else if self.source[0] == b'`' {
+            self.lex_quoted_bareword()
         } else if self.source[0] == b' '
             || self.source[0] == b'\t'
             || self.source[0] == b'\r'
