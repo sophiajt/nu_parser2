@@ -384,6 +384,13 @@ impl<'a> Parser<'a> {
             } else {
                 let result = self.statement_or_definition();
                 code_body.push(result);
+
+                self.skip_space();
+                if !self.is_rcurly() && !self.is_semicolon() && !self.is_newline() {
+                    self.error(ParseErrorType::Expected(
+                        "new line or semicolon".to_string(),
+                    ));
+                }
             }
         }
         let span_end = self.position();
@@ -1244,7 +1251,7 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == b"bitw" => true,
+            }) if contents == b"bit" => true,
             _ => false,
         }
     }
