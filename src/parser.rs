@@ -1316,6 +1316,9 @@ impl<'a> Parser<'a> {
             Some(Token {
                 token_type: TokenType::String,
                 ..
+            }) | Some(Token {
+                token_type: TokenType::SimpleString,
+                ..
             })
         )
     }
@@ -1353,6 +1356,10 @@ impl<'a> Parser<'a> {
             })
             | Some(Token {
                 token_type: TokenType::String,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::SimpleString,
                 ..
             })
             | Some(Token {
@@ -1536,6 +1543,15 @@ impl<'a> Parser<'a> {
         match self.lexer.peek() {
             Some(Token {
                 token_type: TokenType::String,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                self.lexer.next();
+                self.create_node(NodeType::String, span_start, span_end)
+            }
+            Some(Token {
+                token_type: TokenType::SimpleString,
                 span_start,
                 span_end,
                 ..

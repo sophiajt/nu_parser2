@@ -14,6 +14,7 @@ pub enum TokenType {
     Space,
     Newline,
     Comma,
+    SimpleString,
     String,
     Dot,
     DotDot,
@@ -79,8 +80,13 @@ impl<'a> Lexer<'a> {
     pub fn lex_quoted_string(&mut self) -> Option<Token<'a>> {
         let span_start = self.span_offset;
         let mut token_offset = 1;
+        let mut is_escaped = false;
         while token_offset < self.source.len() {
-            if self.source[token_offset] == b'"' {
+            if is_escaped {
+                is_escaped = false;
+            } else if self.source[token_offset] == b'\\' {
+                is_escaped = true;
+            } else if self.source[token_offset] == b'"' {
                 token_offset += 1;
                 break;
             }
@@ -94,6 +100,30 @@ impl<'a> Lexer<'a> {
 
         Some(Token {
             token_type: TokenType::String,
+            contents,
+            span_start,
+            span_end: self.span_offset,
+        })
+    }
+
+    pub fn lex_single_quoted_string(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+        let mut token_offset = 1;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] == b'\'' {
+                token_offset += 1;
+                break;
+            }
+            token_offset += 1;
+        }
+
+        self.span_offset += token_offset;
+
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::SimpleString,
             contents,
             span_start,
             span_end: self.span_offset,
@@ -528,6 +558,8 @@ impl<'a> Lexer<'a> {
             self.lex_number()
         } else if self.source[0] == b'"' {
             self.lex_quoted_string()
+        } else if self.source[0] == b'\'' {
+            self.lex_single_quoted_string()
         } else if self.source[0] == b'`' {
             self.lex_quoted_bareword()
         } else if self.source[0] == b' '
