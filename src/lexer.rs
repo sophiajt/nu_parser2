@@ -13,6 +13,7 @@ pub enum TokenType {
     String,
     Dot,
     Dollar,
+    Variable,
     Pipe,
     Colon,
     Semicolon,
@@ -140,6 +141,31 @@ impl<'a> Lexer<'a> {
             contents,
             span_start,
             span_end: span_start + 1,
+        })
+    }
+
+    pub fn lex_variable(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+        self.span_offset += 1;
+
+        let mut token_offset = 1;
+        while token_offset < self.source.len() {
+            if self.source[token_offset].is_ascii_whitespace()
+                || is_symbol(self.source[token_offset])
+            {
+                break;
+            }
+            token_offset += 1;
+        }
+        self.span_offset += token_offset;
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::Variable,
+            contents,
+            span_start,
+            span_end: self.span_offset,
         })
     }
 
@@ -279,9 +305,7 @@ impl<'a> Lexer<'a> {
         let span_start = self.span_offset;
         let mut token_offset = 0;
         while token_offset < self.source.len() {
-            if self.source[token_offset].is_ascii_whitespace()
-                || is_symbol(self.source[token_offset])
-            {
+            if self.source[token_offset].is_ascii_whitespace() {
                 break;
             }
             token_offset += 1;
@@ -311,6 +335,8 @@ impl<'a> Iterator for Lexer<'a> {
             self.lex_quoted_string()
         } else if self.source[0] == b' ' || self.source[0] == b'\t' || self.source[0] == b'\r' {
             self.lex_space()
+        } else if self.source[0] == b'$' {
+            self.lex_variable()
         } else if is_symbol(self.source[0]) {
             self.lex_symbol()
         } else if self.source[0] == b'\n' {

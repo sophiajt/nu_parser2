@@ -386,7 +386,11 @@ impl<'a> Parser<'a> {
                 code_body.push(result);
 
                 self.skip_space();
-                if !self.is_rcurly() && !self.is_semicolon() && !self.is_newline() {
+                if !self.is_rcurly()
+                    && !self.is_semicolon()
+                    && !self.is_newline()
+                    && self.has_tokens()
+                {
                     self.error(ParseErrorType::Expected(
                         "new line or semicolon".to_string(),
                     ));
@@ -524,8 +528,8 @@ impl<'a> Parser<'a> {
             self.list()
         } else if self.is_keyword(b"true") || self.is_keyword(b"false") {
             self.boolean()
-        } else if self.is_dollar() {
-            self.variable_name()
+        } else if self.is_variable() {
+            self.variable()
         } else if self.is_string() {
             self.string()
         } else {
@@ -563,119 +567,26 @@ impl<'a> Parser<'a> {
                     }
                     TokenType::Bareword => {
                         if contents == b"in" {
+                            self.lexer.next();
                             self.create_node(NodeType::In, span_start, span_end)
-                        } else if contents == b"not" {
+                        } else if contents == b"not-in" {
                             self.lexer.next();
-                            let dash = self.lexer.next();
-                            let bareword = self.lexer.next();
-                            match (dash, bareword) {
-                                (
-                                    Some(Token {
-                                        token_type: TokenType::Dash,
-                                        ..
-                                    }),
-                                    Some(Token {
-                                        token_type: TokenType::Bareword,
-                                        contents,
-                                        span_end,
-                                        ..
-                                    }),
-                                ) => {
-                                    if contents == b"in" {
-                                        self.create_node(NodeType::NotIn, span_start, span_end)
-                                    } else {
-                                        self.error(ParseErrorType::Expected("operator".to_string()))
-                                    }
-                                }
-                                _ => self.error(ParseErrorType::Expected("operator".to_string())),
-                            }
-                        } else if contents == b"starts" {
+                            self.create_node(NodeType::NotIn, span_start, span_end)
+                        } else if contents == b"bit-or" {
                             self.lexer.next();
-                            let dash = self.lexer.next();
-                            let bareword = self.lexer.next();
-                            match (dash, bareword) {
-                                (
-                                    Some(Token {
-                                        token_type: TokenType::Dash,
-                                        ..
-                                    }),
-                                    Some(Token {
-                                        token_type: TokenType::Bareword,
-                                        contents,
-                                        span_end,
-                                        ..
-                                    }),
-                                ) => {
-                                    if contents == b"with" {
-                                        self.create_node(NodeType::StartsWith, span_start, span_end)
-                                    } else {
-                                        self.error(ParseErrorType::Expected("operator".to_string()))
-                                    }
-                                }
-                                _ => self.error(ParseErrorType::Expected("operator".to_string())),
-                            }
-                        } else if contents == b"ends" {
+                            self.create_node(NodeType::BitOr, span_start, span_end)
+                        } else if contents == b"bit-and" {
                             self.lexer.next();
-                            let dash = self.lexer.next();
-                            let bareword = self.lexer.next();
-                            match (dash, bareword) {
-                                (
-                                    Some(Token {
-                                        token_type: TokenType::Dash,
-                                        ..
-                                    }),
-                                    Some(Token {
-                                        token_type: TokenType::Bareword,
-                                        contents,
-                                        span_end,
-                                        ..
-                                    }),
-                                ) => {
-                                    if contents == b"with" {
-                                        self.create_node(NodeType::EndsWith, span_start, span_end)
-                                    } else {
-                                        self.error(ParseErrorType::Expected("operator".to_string()))
-                                    }
-                                }
-                                _ => self.error(ParseErrorType::Expected("operator".to_string())),
-                            }
-                        } else if contents == b"bit" {
+                            self.create_node(NodeType::BitAnd, span_start, span_end)
+                        } else if contents == b"bit-xor" {
                             self.lexer.next();
-                            let dash = self.lexer.next();
-                            let bareword = self.lexer.next();
-                            match (dash, bareword) {
-                                (
-                                    Some(Token {
-                                        token_type: TokenType::Dash,
-                                        ..
-                                    }),
-                                    Some(Token {
-                                        token_type: TokenType::Bareword,
-                                        contents,
-                                        span_end,
-                                        ..
-                                    }),
-                                ) => {
-                                    if contents == b"or" {
-                                        self.create_node(NodeType::BitOr, span_start, span_end)
-                                    } else if contents == b"and" {
-                                        self.create_node(NodeType::BitAnd, span_start, span_end)
-                                    } else if contents == b"xor" {
-                                        self.create_node(NodeType::BitXor, span_start, span_end)
-                                    } else if contents == b"shl" {
-                                        self.create_node(NodeType::ShiftLeft, span_start, span_end)
-                                    } else if contents == b"shr" {
-                                        self.create_node(NodeType::ShiftRight, span_start, span_end)
-                                    } else {
-                                        self.error(ParseErrorType::Expected("operator".to_string()))
-                                    }
-                                }
-                                _ => self.error(ParseErrorType::Expected("operator".to_string())),
-                            }
-                        } else if contents == b"and" {
-                            self.create_node(NodeType::And, span_start, span_end)
-                        } else if contents == b"or" {
-                            self.create_node(NodeType::Or, span_start, span_end)
+                            self.create_node(NodeType::BitXor, span_start, span_end)
+                        } else if contents == b"bit-shl" {
+                            self.lexer.next();
+                            self.create_node(NodeType::ShiftLeft, span_start, span_end)
+                        } else if contents == b"bit-shr" {
+                            self.lexer.next();
+                            self.create_node(NodeType::ShiftRight, span_start, span_end)
                         } else {
                             self.error(ParseErrorType::Expected("operator".to_string()))
                         }
@@ -792,7 +703,7 @@ impl<'a> Parser<'a> {
         self.keyword(b"let");
 
         self.skip_whitespace();
-        let variable_name = self.variable_name();
+        let variable_name = self.variable();
 
         self.skip_whitespace();
         self.equals();
@@ -818,7 +729,7 @@ impl<'a> Parser<'a> {
         self.keyword(b"let-env");
 
         self.skip_whitespace();
-        let variable_name = self.variable_name();
+        let variable_name = self.variable();
 
         self.skip_whitespace();
         self.equals();
@@ -844,7 +755,7 @@ impl<'a> Parser<'a> {
         self.keyword(b"mut");
 
         self.skip_whitespace();
-        let variable_name = self.variable_name();
+        let variable_name = self.variable();
 
         self.skip_whitespace();
         self.equals();
@@ -887,7 +798,6 @@ impl<'a> Parser<'a> {
             } else if self.is_rparen() || self.is_newline() || self.is_rcurly() {
                 break;
             } else {
-                println!("{:?}", self.lexer.peek());
                 self.error(ParseErrorType::Expected("pipeline elements".to_string()));
             }
         }
@@ -1033,30 +943,6 @@ impl<'a> Parser<'a> {
         self.create_node(NodeType::Flag, span_start, span_end)
     }
 
-    pub fn variable_name(&mut self) -> NodeId {
-        // TODO: add support for `$` in front of variable name
-
-        let span_start = self.position();
-
-        // Skip the dollar sign if it's there
-        if self.is_dollar() {
-            self.lexer.next();
-        }
-
-        match self.lexer.peek() {
-            Some(Token {
-                token_type: TokenType::Bareword,
-                span_end,
-                ..
-            }) => {
-                let span_end = *span_end;
-                self.lexer.next();
-                self.create_node(NodeType::Variable, span_start, span_end)
-            }
-            _ => self.error(ParseErrorType::Expected("variable name".to_string())),
-        }
-    }
-
     pub fn name(&mut self) -> NodeId {
         match self.lexer.peek() {
             Some(Token {
@@ -1109,7 +995,7 @@ impl<'a> Parser<'a> {
 
             // Parse param
             let span_start = self.position();
-            let name = self.variable_name();
+            let name = self.variable();
             self.skip_whitespace();
             if self.is_colon() {
                 // Optional type
@@ -1236,22 +1122,42 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == b"not" => true,
+            }) if contents == b"not-in" => true,
             Some(Token {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == b"starts" => true,
+            }) if contents == b"starts-with" => true,
             Some(Token {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == b"ends" => true,
+            }) if contents == b"ends-with" => true,
             Some(Token {
                 token_type: TokenType::Bareword,
                 contents,
                 ..
-            }) if contents == b"bit" => true,
+            }) if contents == b"bit-or" => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"bit-xor" => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"bit-and" => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"bit-shl" => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"bit-shr" => true,
             _ => false,
         }
     }
@@ -1261,16 +1167,6 @@ impl<'a> Parser<'a> {
             self.lexer.peek(),
             Some(Token {
                 token_type: TokenType::Comma,
-                ..
-            })
-        )
-    }
-
-    pub fn is_dollar(&mut self) -> bool {
-        matches!(
-            self.lexer.peek(),
-            Some(Token {
-                token_type: TokenType::Dollar,
                 ..
             })
         )
@@ -1429,6 +1325,16 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn is_variable(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::Variable,
+                ..
+            })
+        )
+    }
+
     pub fn is_string(&mut self) -> bool {
         matches!(
             self.lexer.peek(),
@@ -1476,7 +1382,7 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::LSquare,
                 ..
             }) | Some(Token {
-                token_type: TokenType::Dollar,
+                token_type: TokenType::Variable,
                 ..
             })
         )
@@ -1593,6 +1499,36 @@ impl<'a> Parser<'a> {
                 self.create_node(NodeType::False, span_start, span_end)
             }
             _ => self.error(ParseErrorType::Expected("boolean".to_string())),
+        }
+    }
+
+    pub fn variable(&mut self) -> NodeId {
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::Variable,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+
+                self.lexer.next();
+                self.create_node(NodeType::Variable, span_start, span_end)
+            }
+            Some(Token {
+                token_type: TokenType::Bareword,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                let span_start = *span_start;
+                let span_end = *span_end;
+
+                self.lexer.next();
+                self.create_node(NodeType::Variable, span_start, span_end)
+            }
+            _ => self.error(ParseErrorType::Expected("variable".to_string())),
         }
     }
 
