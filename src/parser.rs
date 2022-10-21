@@ -113,6 +113,7 @@ pub enum NodeType {
         then_block: NodeId,
         else_expression: Option<NodeId>,
     },
+    Where(NodeId),
     Garbage,
 }
 
@@ -358,6 +359,13 @@ impl ParserDelta {
                     self.print_helper(else_expression, indent + 2)
                 }
             }
+            NodeType::Where(condition) => {
+                println!(
+                    "Where ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+                self.print_helper(condition, indent + 2);
+            }
             x => {
                 println!(
                     "{:?} ({}, {})",
@@ -479,6 +487,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn expression_or_call(&mut self) -> NodeId {
+        if self.is_expression() {
+            self.expression()
+        } else {
+            self.call()
+        }
+    }
+
     pub fn expression(&mut self) -> NodeId {
         let mut expr_stack = vec![];
 
@@ -487,6 +503,8 @@ impl<'a> Parser<'a> {
         // Check for special forms
         if self.is_keyword(b"if") {
             return self.if_expression();
+        } else if self.is_keyword(b"where") {
+            return self.where_expression();
         }
 
         // Otherwise assume a math expression
@@ -944,6 +962,19 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn where_expression(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        self.keyword(b"where");
+
+        self.skip_whitespace();
+        let condition = self.expression();
+
+        let span_end = self.position();
+
+        self.create_node(NodeType::Where(condition), span_start, span_end)
+    }
+
     pub fn pipeline(&mut self) -> NodeId {
         let span_start = self.position();
         let mut from = self.call();
@@ -953,7 +984,9 @@ impl<'a> Parser<'a> {
             if self.is_pipe() {
                 self.lexer.next();
                 self.skip_space();
-                let to = self.call();
+
+                let to = self.expression_or_call();
+
                 let span_end = self.position();
 
                 from = self.create_node(NodeType::Pipeline { from, to }, span_start, span_end)
@@ -967,14 +1000,14 @@ impl<'a> Parser<'a> {
             } else if self.is_double_ampersand() {
                 self.lexer.next();
                 self.skip_space();
-                let rhs = self.call();
+                let rhs = self.expression_or_call();
                 let span_end = self.position();
 
                 from = self.create_node(NodeType::BashAnd { lhs: from, rhs }, span_start, span_end)
             } else if self.is_double_pipe() {
                 self.lexer.next();
                 self.skip_space();
-                let rhs = self.call();
+                let rhs = self.expression_or_call();
                 let span_end = self.position();
 
                 from = self.create_node(NodeType::BashOr { lhs: from, rhs }, span_start, span_end)
@@ -1537,15 +1570,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn is_expression(&mut self) -> bool {
-        if self.is_simple_expression() {
-            return true;
-        }
-
-        matches!(self.lexer.peek(), Some(Token {
-            token_type: TokenType::Bareword,
-            contents,
-            ..
-        }) if contents == b"if")
+        self.is_simple_expression() || self.is_keyword(b"if") || self.is_keyword(b"where")
     }
 
     pub fn is_simple_expression(&mut self) -> bool {

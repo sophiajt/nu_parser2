@@ -5,3 +5,5 @@ if true and false {
 } else {
     print "else expression!"
 }
+
+ls | where true or false
