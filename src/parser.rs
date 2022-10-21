@@ -549,9 +549,13 @@ impl<'a> Parser<'a> {
                 let span_end = *span_end;
 
                 match token_type {
-                    TokenType::PlusSign => {
+                    TokenType::Plus => {
                         self.lexer.next();
                         self.create_node(NodeType::Plus, span_start, span_end)
+                    }
+                    TokenType::PlusPlus => {
+                        self.lexer.next();
+                        self.create_node(NodeType::Append, span_start, span_end)
                     }
                     TokenType::Dash => {
                         self.lexer.next();
@@ -565,15 +569,45 @@ impl<'a> Parser<'a> {
                         self.lexer.next();
                         self.create_node(NodeType::Divide, span_start, span_end)
                     }
-                    TokenType::LAngle => {
+                    TokenType::ForwardSlashForwardSlash => {
                         self.lexer.next();
-                        // TODO add <=
+                        self.create_node(NodeType::FloorDivision, span_start, span_end)
+                    }
+                    TokenType::LessThan => {
+                        self.lexer.next();
                         self.create_node(NodeType::LessThan, span_start, span_end)
                     }
-                    TokenType::RAngle => {
+                    TokenType::LessThanEqual => {
                         self.lexer.next();
-                        // TODO add >=
+                        self.create_node(NodeType::LessThanOrEqual, span_start, span_end)
+                    }
+                    TokenType::GreaterThan => {
+                        self.lexer.next();
                         self.create_node(NodeType::GreaterThan, span_start, span_end)
+                    }
+                    TokenType::GreaterThanEqual => {
+                        self.lexer.next();
+                        self.create_node(NodeType::GreaterThanOrEqual, span_start, span_end)
+                    }
+                    TokenType::EqualsEquals => {
+                        self.lexer.next();
+                        self.create_node(NodeType::Equal, span_start, span_end)
+                    }
+                    TokenType::ExclamationEquals => {
+                        self.lexer.next();
+                        self.create_node(NodeType::NotEqual, span_start, span_end)
+                    }
+                    TokenType::AsteriskAsterisk => {
+                        self.lexer.next();
+                        self.create_node(NodeType::Pow, span_start, span_end)
+                    }
+                    TokenType::EqualsTilde => {
+                        self.lexer.next();
+                        self.create_node(NodeType::RegexMatch, span_start, span_end)
+                    }
+                    TokenType::ExclamationTilde => {
+                        self.lexer.next();
+                        self.create_node(NodeType::NotRegexMatch, span_start, span_end)
                     }
                     TokenType::Bareword => {
                         if contents == b"in" {
@@ -804,7 +838,7 @@ impl<'a> Parser<'a> {
                 let span_end = self.position();
 
                 from = self.create_node(NodeType::Pipeline { from, to }, span_start, span_end)
-            } else if self.is_rangle() {
+            } else if self.is_greater_than() {
                 self.lexer.next();
                 self.skip_space();
                 let to = self.bareword();
@@ -920,7 +954,7 @@ impl<'a> Parser<'a> {
                 || self.is_pipe()
                 || self.is_rcurly()
                 || self.is_newline()
-                || self.is_rangle()
+                || self.is_greater_than()
             {
                 break;
             }
@@ -1102,78 +1136,38 @@ impl<'a> Parser<'a> {
     pub fn is_operator(&mut self) -> bool {
         match self.lexer.peek() {
             Some(Token {
-                token_type: TokenType::PlusSign,
-                ..
-            })
-            | Some(Token {
-                token_type: TokenType::Dash,
-                ..
-            })
-            | Some(Token {
-                token_type: TokenType::Asterisk,
-                ..
-            })
-            | Some(Token {
-                token_type: TokenType::ForwardSlash,
-                ..
-            }) => true,
-            Some(Token {
-                token_type: TokenType::RAngle,
-                ..
-            }) => true,
-            Some(Token {
-                token_type: TokenType::LAngle,
-                ..
-            }) => true,
-            Some(Token {
-                token_type: TokenType::Equals,
-                ..
-            }) => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
+                token_type,
                 contents,
                 ..
-            }) if contents == b"in" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"not-in" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"starts-with" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"ends-with" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"bit-or" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"bit-xor" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"bit-and" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"bit-shl" => true,
-            Some(Token {
-                token_type: TokenType::Bareword,
-                contents,
-                ..
-            }) if contents == b"bit-shr" => true,
+            }) => match token_type {
+                TokenType::Asterisk
+                | TokenType::AsteriskAsterisk
+                | TokenType::Dash
+                | TokenType::EqualsEquals
+                | TokenType::EqualsTilde
+                | TokenType::ExclamationEquals
+                | TokenType::ExclamationTilde
+                | TokenType::ForwardSlash
+                | TokenType::ForwardSlashForwardSlash
+                | TokenType::LessThan
+                | TokenType::LessThanEqual
+                | TokenType::Plus
+                | TokenType::PlusPlus
+                | TokenType::GreaterThan
+                | TokenType::GreaterThanEqual => true,
+
+                TokenType::Bareword if contents == b"in" => true,
+                TokenType::Bareword if contents == b"not-in" => true,
+                TokenType::Bareword if contents == b"starts-with" => true,
+                TokenType::Bareword if contents == b"ends-with" => true,
+                TokenType::Bareword if contents == b"bit-or" => true,
+                TokenType::Bareword if contents == b"bit-xor" => true,
+                TokenType::Bareword if contents == b"bit-and" => true,
+                TokenType::Bareword if contents == b"bit-shl" => true,
+                TokenType::Bareword if contents == b"bit-shr" => true,
+
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -1248,21 +1242,21 @@ impl<'a> Parser<'a> {
         )
     }
 
-    pub fn is_langle(&mut self) -> bool {
+    pub fn is_less_than(&mut self) -> bool {
         matches!(
             self.lexer.peek(),
             Some(Token {
-                token_type: TokenType::LAngle,
+                token_type: TokenType::LessThan,
                 ..
             })
         )
     }
 
-    pub fn is_rangle(&mut self) -> bool {
+    pub fn is_greater_than(&mut self) -> bool {
         matches!(
             self.lexer.peek(),
             Some(Token {
-                token_type: TokenType::RAngle,
+                token_type: TokenType::GreaterThan,
                 ..
             })
         )

@@ -12,24 +12,35 @@ pub enum TokenType {
     Comma,
     String,
     Dot,
+    DotDot,
     Dollar,
     Variable,
     Pipe,
     Colon,
     Semicolon,
-    PlusSign,
+    Plus,
+    PlusPlus,
     Dash,
+    Exclamation,
     Asterisk,
+    AsteriskAsterisk,
     ForwardSlash,
+    ForwardSlashForwardSlash,
     Equals,
+    EqualsEquals,
+    EqualsTilde,
+    ExclamationTilde,
+    ExclamationEquals,
     LParen,
     LSquare,
     LCurly,
-    LAngle,
+    LessThan,
+    LessThanEqual,
     RParen,
     RSquare,
     RCurly,
-    RAngle,
+    GreaterThan,
+    GreaterThanEqual,
     Bareword,
 }
 
@@ -44,7 +55,7 @@ pub struct Token<'a> {
 fn is_symbol(b: u8) -> bool {
     [
         b'+', b'-', b'*', b'/', b'.', b',', b'(', b'[', b'{', b'<', b')', b']', b'}', b'>', b':',
-        b';', b'=', b'$', b'|',
+        b';', b'=', b'$', b'|', b'!', b'~',
     ]
     .contains(&b)
 }
@@ -191,12 +202,23 @@ impl<'a> Lexer<'a> {
                 span_start,
                 span_end: span_start + 1,
             },
-            b'<' => Token {
-                token_type: TokenType::LAngle,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
+            b'<' => {
+                if self.source.len() > 1 && self.source[1] == b'=' {
+                    Token {
+                        token_type: TokenType::LessThanEqual,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::LessThan,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
             b')' => Token {
                 token_type: TokenType::RParen,
                 contents: &self.source[..1],
@@ -215,42 +237,104 @@ impl<'a> Lexer<'a> {
                 span_start,
                 span_end: span_start + 1,
             },
-            b'>' => Token {
-                token_type: TokenType::RAngle,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
-            b'+' => Token {
-                token_type: TokenType::PlusSign,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
+            b'>' => {
+                if self.source.len() > 1 && self.source[1] == b'=' {
+                    Token {
+                        token_type: TokenType::GreaterThanEqual,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::GreaterThan,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
+            b'+' => {
+                if self.source.len() > 1 && self.source[1] == b'+' {
+                    Token {
+                        token_type: TokenType::PlusPlus,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Plus,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
             b'-' => Token {
                 token_type: TokenType::Dash,
                 contents: &self.source[..1],
                 span_start,
                 span_end: span_start + 1,
             },
-            b'*' => Token {
-                token_type: TokenType::Asterisk,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
-            b'/' => Token {
-                token_type: TokenType::ForwardSlash,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
-            b'=' => Token {
-                token_type: TokenType::Equals,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
+            b'*' => {
+                if self.source.len() > 1 && self.source[1] == b'*' {
+                    Token {
+                        token_type: TokenType::AsteriskAsterisk,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Asterisk,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
+            b'/' => {
+                if self.source.len() > 1 && self.source[1] == b'/' {
+                    Token {
+                        token_type: TokenType::ForwardSlashForwardSlash,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::ForwardSlash,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
+            b'=' => {
+                if self.source.len() > 1 && self.source[1] == b'=' {
+                    Token {
+                        token_type: TokenType::EqualsEquals,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else if self.source.len() > 1 && self.source[1] == b'~' {
+                    Token {
+                        token_type: TokenType::EqualsTilde,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Equals,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
             b':' => Token {
                 token_type: TokenType::Colon,
                 contents: &self.source[..1],
@@ -263,12 +347,47 @@ impl<'a> Lexer<'a> {
                 span_start,
                 span_end: span_start + 1,
             },
-            b'.' => Token {
-                token_type: TokenType::Dot,
-                contents: &self.source[..1],
-                span_start,
-                span_end: span_start + 1,
-            },
+            b'.' => {
+                if self.source.len() > 1 && self.source[1] == b'.' {
+                    Token {
+                        token_type: TokenType::DotDot,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Dot,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
+            b'!' => {
+                if self.source.len() > 1 && self.source[1] == b'=' {
+                    Token {
+                        token_type: TokenType::ExclamationEquals,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else if self.source.len() > 1 && self.source[1] == b'~' {
+                    Token {
+                        token_type: TokenType::ExclamationTilde,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else {
+                    Token {
+                        token_type: TokenType::Exclamation,
+                        contents: &self.source[..1],
+                        span_start,
+                        span_end: span_start + 1,
+                    }
+                }
+            }
             b'$' => Token {
                 token_type: TokenType::Dollar,
                 contents: &self.source[..1],
