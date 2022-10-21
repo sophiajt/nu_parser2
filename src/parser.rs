@@ -320,6 +320,24 @@ impl ParserDelta {
                 self.print_helper(op, indent + 2);
                 self.print_helper(rhs, indent + 2)
             }
+            NodeType::BashAnd { lhs, rhs } => {
+                println!(
+                    "BashAnd ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(lhs, indent + 2);
+                self.print_helper(rhs, indent + 2)
+            }
+            NodeType::BashOr { lhs, rhs } => {
+                println!(
+                    "BashOr ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(lhs, indent + 2);
+                self.print_helper(rhs, indent + 2)
+            }
             x => {
                 println!(
                     "{:?} ({}, {})",
@@ -614,6 +632,14 @@ impl<'a> Parser<'a> {
                     TokenType::ExclamationTilde => {
                         self.lexer.next();
                         self.create_node(NodeType::NotRegexMatch, span_start, span_end)
+                    }
+                    TokenType::AmpersandAmpersand => {
+                        self.lexer.next();
+                        self.create_node(NodeType::And, span_start, span_end)
+                    }
+                    TokenType::PipePipe => {
+                        self.lexer.next();
+                        self.create_node(NodeType::Or, span_start, span_end)
                     }
                     TokenType::Bareword => {
                         if contents == b"in" {
@@ -1185,7 +1211,9 @@ impl<'a> Parser<'a> {
                 | TokenType::Plus
                 | TokenType::PlusPlus
                 | TokenType::GreaterThan
-                | TokenType::GreaterThanEqual => true,
+                | TokenType::GreaterThanEqual
+                | TokenType::AmpersandAmpersand
+                | TokenType::PipePipe => true,
 
                 TokenType::Bareword if contents == b"in" => true,
                 TokenType::Bareword if contents == b"not-in" => true,
@@ -1431,25 +1459,39 @@ impl<'a> Parser<'a> {
     }
 
     pub fn is_simple_expression(&mut self) -> bool {
-        matches!(
-            self.lexer.peek(),
+        match self.lexer.peek() {
             Some(Token {
                 token_type: TokenType::Number,
                 ..
-            }) | Some(Token {
+            })
+            | Some(Token {
                 token_type: TokenType::String,
                 ..
-            }) | Some(Token {
+            })
+            | Some(Token {
                 token_type: TokenType::LCurly,
                 ..
-            }) | Some(Token {
+            })
+            | Some(Token {
                 token_type: TokenType::LSquare,
                 ..
-            }) | Some(Token {
+            })
+            | Some(Token {
                 token_type: TokenType::Variable,
                 ..
-            })
-        )
+            }) => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"true" => true,
+            Some(Token {
+                token_type: TokenType::Bareword,
+                contents,
+                ..
+            }) if contents == b"false" => true,
+            _ => false,
+        }
     }
 
     pub fn lsquare(&mut self) {

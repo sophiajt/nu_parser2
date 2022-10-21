@@ -3,3 +3,5 @@ let-env abc = 123
 
 3 > 4
 a > b
+
+true && false
