@@ -108,6 +108,11 @@ pub enum NodeType {
         lhs: NodeId,
         rhs: NodeId,
     },
+    If {
+        condition: NodeId,
+        then_block: NodeId,
+        else_expression: Option<NodeId>,
+    },
     Garbage,
 }
 
@@ -338,6 +343,21 @@ impl ParserDelta {
                 self.print_helper(lhs, indent + 2);
                 self.print_helper(rhs, indent + 2)
             }
+            NodeType::If {
+                condition,
+                then_block,
+                else_expression,
+            } => {
+                println!(
+                    "If ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+                self.print_helper(condition, indent + 2);
+                self.print_helper(then_block, indent + 2);
+                if let Some(else_expression) = else_expression {
+                    self.print_helper(else_expression, indent + 2)
+                }
+            }
             x => {
                 println!(
                     "{:?} ({}, {})",
@@ -400,7 +420,7 @@ impl<'a> Parser<'a> {
         while self.has_tokens() {
             if self.is_whitespace() {
                 self.skip_whitespace();
-            } else if self.is_rcurly() && in_block {
+            } else if (self.is_rcurly() || self.is_rparen()) && in_block {
                 break;
             } else if self.is_semicolon() {
                 self.lexer.next();
@@ -411,6 +431,7 @@ impl<'a> Parser<'a> {
 
                 self.skip_space();
                 if !self.is_rcurly()
+                    && !self.is_rparen()
                     && !self.is_semicolon()
                     && !self.is_newline()
                     && self.has_tokens()
@@ -443,7 +464,7 @@ impl<'a> Parser<'a> {
             self.let_env_statement()
         } else if self.is_keyword(b"mut") {
             self.mut_statement()
-        } else if self.is_simple_expression() {
+        } else if self.is_expression() {
             self.expression()
         } else {
             self.pipeline()
@@ -451,7 +472,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn expression_or_pipeline(&mut self) -> NodeId {
-        if self.is_simple_expression() {
+        if self.is_expression() {
             self.expression()
         } else {
             self.pipeline()
@@ -463,6 +484,12 @@ impl<'a> Parser<'a> {
 
         let mut last_prec = 1000000;
 
+        // Check for special forms
+        if self.is_keyword(b"if") {
+            return self.if_expression();
+        }
+
+        // Otherwise assume a math expression
         let lhs = self.simple_expression();
 
         expr_stack.push(lhs);
@@ -548,6 +575,8 @@ impl<'a> Parser<'a> {
     pub fn simple_expression(&mut self) -> NodeId {
         if self.is_lcurly() {
             self.block()
+        } else if self.is_lparen() {
+            self.subexpression()
         } else if self.is_lsquare() {
             self.list()
         } else if self.is_keyword(b"true") || self.is_keyword(b"false") {
@@ -712,6 +741,22 @@ impl<'a> Parser<'a> {
         output
     }
 
+    pub fn subexpression(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        // FIXME: Add line-skipping to subexpressions
+        self.lparen();
+        let output = self.code_block(true);
+        self.rparen();
+
+        let span_end = self.position();
+
+        self.delta.span_start[output.0] = span_start;
+        self.delta.span_end[output.0] = span_end;
+
+        output
+    }
+
     pub fn list(&mut self) -> NodeId {
         let span_start = self.position();
 
@@ -860,6 +905,39 @@ impl<'a> Parser<'a> {
             NodeType::Mut {
                 variable_name,
                 initializer,
+            },
+            span_start,
+            span_end,
+        )
+    }
+
+    pub fn if_expression(&mut self) -> NodeId {
+        let mut else_expression = None;
+
+        let span_start = self.position();
+
+        self.keyword(b"if");
+
+        self.skip_whitespace();
+        let condition = self.expression();
+
+        self.skip_whitespace();
+        let then_block = self.block();
+
+        self.skip_whitespace();
+        if self.is_keyword(b"else") {
+            self.lexer.next();
+            self.skip_whitespace();
+            else_expression = Some(self.expression());
+        }
+
+        let span_end = self.position();
+
+        self.create_node(
+            NodeType::If {
+                condition,
+                then_block,
+                else_expression,
             },
             span_start,
             span_end,
@@ -1458,6 +1536,18 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn is_expression(&mut self) -> bool {
+        if self.is_simple_expression() {
+            return true;
+        }
+
+        matches!(self.lexer.peek(), Some(Token {
+            token_type: TokenType::Bareword,
+            contents,
+            ..
+        }) if contents == b"if")
+    }
+
     pub fn is_simple_expression(&mut self) -> bool {
         match self.lexer.peek() {
             Some(Token {
@@ -1474,6 +1564,10 @@ impl<'a> Parser<'a> {
             })
             | Some(Token {
                 token_type: TokenType::LSquare,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::LParen,
                 ..
             })
             | Some(Token {
