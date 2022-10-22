@@ -19,7 +19,7 @@ TODO:
 - [ ] Default args in custom commands
 - [ ] Aliases
 - [ ] Mixing symbols and barewords, eg) `ls *`
-- [ ] Barewords as implied strings. Or disallow this in 0.80. eg) `[larry moe curly]`
+- [x] Barewords as implied strings. Or disallow this in 0.80. eg) `[larry moe curly]`
 - [ ] Unescaping escaped strings
 - [ ] Comments
 - [ ] Attaching comments to parsed nodes

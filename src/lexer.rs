@@ -517,11 +517,15 @@ impl<'a> Lexer<'a> {
         let mut token_offset = 0;
         while token_offset < self.source.len() {
             if self.source[token_offset].is_ascii_whitespace()
+                || self.source[token_offset] == b'{'
                 || self.source[token_offset] == b'}'
                 || self.source[token_offset] == b')'
                 || self.source[token_offset] == b'('
+                || self.source[token_offset] == b'['
+                || self.source[token_offset] == b']'
                 || self.source[token_offset] == b';'
                 || self.source[token_offset] == b':'
+                || self.source[token_offset] == b','
             {
                 break;
             }

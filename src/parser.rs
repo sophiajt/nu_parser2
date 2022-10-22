@@ -380,8 +380,12 @@ impl<'a> Parser<'a> {
             self.variable()
         } else if self.is_string() {
             self.string()
-        } else {
+        } else if self.is_number() {
             self.number()
+        } else {
+            let bare_string = self.bareword();
+            self.delta.node_types[bare_string.0] = NodeType::String;
+            bare_string
         }
     }
 
@@ -860,7 +864,7 @@ impl<'a> Parser<'a> {
                     let span_end = self.position();
                     self.lexer.next();
                     args.push(self.create_node(NodeType::NamedArg, span_start, span_end))
-                } else {
+                } else if self.is_colon() {
                     // Traditional call
                     let call_args = self.traditional_args();
                     let span_end = self.position();
@@ -872,6 +876,9 @@ impl<'a> Parser<'a> {
                         span_start,
                         span_end,
                     ))
+                } else {
+                    self.delta.node_types[head.0] = NodeType::String;
+                    args.push(head);
                 }
             } else {
                 let expr = self.simple_expression();
