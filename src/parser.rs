@@ -203,8 +203,8 @@ impl<'a> Parser<'a> {
         let span_start = self.position();
         let mut code_body = vec![];
         while self.has_tokens() {
-            if self.is_whitespace() {
-                self.skip_whitespace();
+            if self.is_whitespace_or_comment() {
+                self.skip_whitespace_and_comments();
             } else if (self.is_rcurly() || self.is_rparen()) && in_block {
                 break;
             } else if self.is_semicolon() {
@@ -219,6 +219,7 @@ impl<'a> Parser<'a> {
                     && !self.is_rparen()
                     && !self.is_semicolon()
                     && !self.is_newline()
+                    && !self.is_comment()
                     && self.has_tokens()
                 {
                     self.error(ParseErrorType::Expected(
@@ -559,7 +560,7 @@ impl<'a> Parser<'a> {
         self.lsquare();
         let mut items = vec![];
         while self.has_tokens() {
-            self.skip_whitespace();
+            self.skip_whitespace_and_comments();
             if self.is_rsquare() {
                 self.lexer.next();
                 break;
@@ -581,13 +582,13 @@ impl<'a> Parser<'a> {
         let span_start = self.position();
         self.keyword(b"def");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let name = self.name();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let params = self.params();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let block = self.block();
 
         let span_end = self.position();
@@ -607,13 +608,13 @@ impl<'a> Parser<'a> {
         let span_start = self.position();
         self.keyword(b"def-env");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let name = self.name();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let params = self.params();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let block = self.block();
 
         let span_end = self.position();
@@ -634,13 +635,13 @@ impl<'a> Parser<'a> {
 
         self.keyword(b"let");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let variable_name = self.variable();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         self.equals();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let initializer = self.expression_or_pipeline();
 
         let span_end = self.position();
@@ -660,13 +661,13 @@ impl<'a> Parser<'a> {
 
         self.keyword(b"let-env");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let variable_name = self.variable();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         self.equals();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let initializer = self.expression_or_pipeline();
 
         let span_end = self.position();
@@ -686,13 +687,13 @@ impl<'a> Parser<'a> {
 
         self.keyword(b"mut");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let variable_name = self.variable();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         self.equals();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let initializer = self.expression_or_pipeline();
 
         let span_end = self.position();
@@ -714,16 +715,16 @@ impl<'a> Parser<'a> {
 
         self.keyword(b"if");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let condition = self.expression();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let then_block = self.block();
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         if self.is_keyword(b"else") {
             self.lexer.next();
-            self.skip_whitespace();
+            self.skip_whitespace_and_comments();
             else_expression = Some(self.expression());
         }
 
@@ -745,7 +746,7 @@ impl<'a> Parser<'a> {
 
         self.keyword(b"where");
 
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         let condition = self.expression();
 
         let span_end = self.position();
@@ -842,7 +843,7 @@ impl<'a> Parser<'a> {
         }
 
         while self.has_tokens() {
-            self.skip_whitespace();
+            self.skip_whitespace_and_comments();
             if self.is_rparen() {
                 self.lexer.next();
                 break;
@@ -992,12 +993,12 @@ impl<'a> Parser<'a> {
             // Parse param
             let span_start = self.position();
             let name = self.variable();
-            self.skip_whitespace();
+            self.skip_whitespace_and_comments();
             if self.is_colon() {
                 // Optional type
                 self.colon();
 
-                self.skip_whitespace();
+                self.skip_whitespace_and_comments();
                 let ty = self.name();
 
                 let span_end = self.position();
@@ -1263,7 +1264,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    pub fn is_whitespace(&mut self) -> bool {
+    pub fn is_whitespace_or_comment(&mut self) -> bool {
         matches!(
             self.lexer.peek(),
             Some(Token {
@@ -1271,6 +1272,9 @@ impl<'a> Parser<'a> {
                 ..
             }) | Some(Token {
                 token_type: TokenType::Newline,
+                ..
+            }) | Some(Token {
+                token_type: TokenType::Comment,
                 ..
             })
         )
@@ -1291,6 +1295,16 @@ impl<'a> Parser<'a> {
             self.lexer.peek(),
             Some(Token {
                 token_type: TokenType::Newline,
+                ..
+            })
+        )
+    }
+
+    pub fn is_comment(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::Comment,
                 ..
             })
         )
@@ -1620,7 +1634,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn skip_whitespace(&mut self) {
+    pub fn skip_whitespace_and_comments(&mut self) {
         loop {
             match self.lexer.peek() {
                 Some(Token {
@@ -1629,6 +1643,10 @@ impl<'a> Parser<'a> {
                 })
                 | Some(Token {
                     token_type: TokenType::Newline,
+                    ..
+                })
+                | Some(Token {
+                    token_type: TokenType::Comment,
                     ..
                 }) => {
                     // keep going

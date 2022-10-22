@@ -14,6 +14,7 @@ pub enum TokenType {
     Space,
     Newline,
     Comma,
+    Comment,
     SimpleString,
     String,
     Dot,
@@ -238,6 +239,29 @@ impl<'a> Lexer<'a> {
 
         Some(Token {
             token_type: TokenType::Variable,
+            contents,
+            span_start,
+            span_end: self.span_offset,
+        })
+    }
+
+    pub fn lex_comment(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+        self.span_offset += 1;
+
+        let mut token_offset = 1;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] == b'\n' {
+                break;
+            }
+            token_offset += 1;
+        }
+        self.span_offset += token_offset;
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::Comment,
             contents,
             span_start,
             span_end: self.span_offset,
@@ -578,6 +602,8 @@ impl<'a> Lexer<'a> {
             self.lex_symbol()
         } else if self.source[0] == b'\n' {
             self.lex_newline()
+        } else if self.source[0] == b'#' {
+            self.lex_comment()
         } else {
             self.lex_bareword()
         }

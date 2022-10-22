@@ -21,6 +21,6 @@ TODO:
 - [x] Mixing symbols and barewords, eg) `ls *`
 - [x] Barewords as implied strings. Or disallow this in 0.80. eg) `[larry moe curly]`
 - [ ] Unescaping escaped strings
-- [ ] Comments
+- [x] Comments
 - [ ] Attaching comments to parsed nodes
 - [ ] Date literals (new kind)
