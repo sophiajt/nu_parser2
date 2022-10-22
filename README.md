@@ -18,7 +18,7 @@ TODO:
 - [ ] Shorthand flags in custom commands
 - [ ] Default args in custom commands
 - [ ] Aliases
-- [ ] Mixing symbols and barewords, eg) `ls *`
+- [x] Mixing symbols and barewords, eg) `ls *`
 - [x] Barewords as implied strings. Or disallow this in 0.80. eg) `[larry moe curly]`
 - [ ] Unescaping escaped strings
 - [ ] Comments

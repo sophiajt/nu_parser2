@@ -821,7 +821,6 @@ impl<'a> Parser<'a> {
     pub fn bareword(&mut self) -> NodeId {
         match self.lexer.peek() {
             Some(Token {
-                token_type: TokenType::Bareword,
                 span_start,
                 span_end,
                 ..
