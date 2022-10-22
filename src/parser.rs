@@ -1,6 +1,7 @@
 use crate::{
     lexer::{Lexer, Token, TokenType},
     parser_delta::ParserDelta,
+    shell_error::{ShellError, ShellErrorType},
 };
 
 #[derive(Debug)]
@@ -157,22 +158,10 @@ impl NodeType {
 #[derive(Debug, Clone, Copy)]
 pub struct NodeId(pub usize);
 
-#[derive(Debug)]
-pub enum ParseErrorType {
-    Expected(String),
-}
-
-#[derive(Debug)]
-pub struct ParseError {
-    error_type: ParseErrorType,
-    span_start: usize,
-    span_end: usize,
-}
-
 pub struct Parser<'a> {
     pub delta: ParserDelta,
     lexer: Lexer<'a>,
-    pub errors: Vec<ParseError>,
+    pub errors: Vec<ShellError>,
     content_length: usize,
 }
 
@@ -226,7 +215,7 @@ impl<'a> Parser<'a> {
                     && !self.is_comment()
                     && self.has_tokens()
                 {
-                    self.error(ParseErrorType::Expected(
+                    self.error(ShellErrorType::Expected(
                         "new line or semicolon".to_string(),
                     ));
                 }
@@ -305,7 +294,7 @@ impl<'a> Parser<'a> {
                 let rhs = if self.is_simple_expression() {
                     self.simple_expression()
                 } else {
-                    self.error(ParseErrorType::Expected(
+                    self.error(ShellErrorType::Expected(
                         "complete math expression".to_string(),
                     ))
                 };
@@ -508,12 +497,12 @@ impl<'a> Parser<'a> {
                         self.lexer.next();
                         self.create_node(NodeType::Modulo, span_start, span_end)
                     } else {
-                        self.error(ParseErrorType::Expected("operator".to_string()))
+                        self.error(ShellErrorType::Expected("operator".to_string()))
                     }
                 }
-                _ => self.error(ParseErrorType::Expected("operator".to_string())),
+                _ => self.error(ShellErrorType::Expected("operator".to_string())),
             },
-            _ => self.error(ParseErrorType::Expected("operator".to_string())),
+            _ => self.error(ShellErrorType::Expected("operator".to_string())),
         }
     }
 
@@ -807,7 +796,7 @@ impl<'a> Parser<'a> {
             } else if self.is_rparen() || self.is_newline() || self.is_rcurly() {
                 break;
             } else {
-                self.error(ParseErrorType::Expected("pipeline elements".to_string()));
+                self.error(ShellErrorType::Expected("pipeline elements".to_string()));
             }
         }
 
@@ -843,7 +832,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::Bareword, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("bare word".to_string())),
+            _ => self.error(ShellErrorType::Expected("bare word".to_string())),
         }
     }
 
@@ -853,7 +842,7 @@ impl<'a> Parser<'a> {
         if self.is_lparen() {
             self.lexer.next();
         } else {
-            args.push(self.error(ParseErrorType::Expected("Left paren '('".to_string())));
+            args.push(self.error(ShellErrorType::Expected("Left paren '('".to_string())));
         }
 
         while self.has_tokens() {
@@ -967,7 +956,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::Name, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("name".to_string())),
+            _ => self.error(ShellErrorType::Expected("name".to_string())),
         }
     }
 
@@ -1052,7 +1041,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected(
+                self.error(ShellErrorType::Expected(
                     String::from_utf8_lossy(keyword).to_string(),
                 ));
             }
@@ -1068,7 +1057,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("equals '='".to_string()));
+                self.error(ShellErrorType::Expected("equals '='".to_string()));
             }
         }
     }
@@ -1082,7 +1071,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("colon ':'".to_string()));
+                self.error(ShellErrorType::Expected("colon ':'".to_string()));
             }
         }
     }
@@ -1096,7 +1085,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("pipe '|'".to_string()));
+                self.error(ShellErrorType::Expected("pipe '|'".to_string()));
             }
         }
     }
@@ -1456,7 +1445,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected(
+                self.error(ShellErrorType::Expected(
                     "left square bracket '['".to_string(),
                 ));
             }
@@ -1472,7 +1461,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected(
+                self.error(ShellErrorType::Expected(
                     "right square bracket ']'".to_string(),
                 ));
             }
@@ -1488,7 +1477,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("left paren '('".to_string()));
+                self.error(ShellErrorType::Expected("left paren '('".to_string()));
             }
         }
     }
@@ -1502,7 +1491,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("right paren ')'".to_string()));
+                self.error(ShellErrorType::Expected("right paren ')'".to_string()));
             }
         }
     }
@@ -1516,7 +1505,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("left bracket '{'".to_string()));
+                self.error(ShellErrorType::Expected("left bracket '{'".to_string()));
             }
         }
     }
@@ -1530,7 +1519,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("right bracket '}'".to_string()));
+                self.error(ShellErrorType::Expected("right bracket '}'".to_string()));
             }
         }
     }
@@ -1555,7 +1544,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::False, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("boolean".to_string())),
+            _ => self.error(ShellErrorType::Expected("boolean".to_string())),
         }
     }
 
@@ -1579,7 +1568,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::Variable, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("variable".to_string())),
+            _ => self.error(ShellErrorType::Expected("variable".to_string())),
         }
     }
 
@@ -1594,7 +1583,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::Int, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("number".to_string())),
+            _ => self.error(ShellErrorType::Expected("number".to_string())),
         }
     }
 
@@ -1618,7 +1607,7 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
                 self.create_node(NodeType::String, span_start, span_end)
             }
-            _ => self.error(ParseErrorType::Expected("string".to_string())),
+            _ => self.error(ShellErrorType::Expected("string".to_string())),
         }
     }
 
@@ -1635,21 +1624,21 @@ impl<'a> Parser<'a> {
         NodeId(self.delta.span_start.len() - 1 + self.delta.node_id_offset)
     }
 
-    pub fn error(&mut self, error_type: ParseErrorType) -> NodeId {
+    pub fn error(&mut self, error_type: ShellErrorType) -> NodeId {
         if let Some(Token {
             span_start,
             span_end,
             ..
         }) = self.lexer.next()
         {
-            self.errors.push(ParseError {
+            self.errors.push(ShellError {
                 error_type,
                 span_start,
                 span_end,
             });
             self.create_node(NodeType::Garbage, span_start, span_end)
         } else {
-            self.errors.push(ParseError {
+            self.errors.push(ShellError {
                 error_type,
                 span_start: self.content_length,
                 span_end: self.content_length,
