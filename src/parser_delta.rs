@@ -101,6 +101,14 @@ impl ParserDelta {
                 self.print_helper(params, indent + 2);
                 self.print_helper(block, indent + 2);
             }
+            NodeType::Closure { params, block } => {
+                println!(
+                    "Closure ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+                self.print_helper(params, indent + 2);
+                self.print_helper(block, indent + 2);
+            }
             NodeType::Block(nodes) => {
                 println!(
                     "Block ({}, {}):",

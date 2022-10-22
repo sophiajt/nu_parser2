@@ -548,6 +548,7 @@ impl<'a> Lexer<'a> {
                 || self.source[token_offset] == b'['
                 || self.source[token_offset] == b']'
                 || self.source[token_offset] == b';'
+                || self.source[token_offset] == b'|'
                 || self.source[token_offset] == b':'
                 || self.source[token_offset] == b','
             {

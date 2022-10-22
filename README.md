@@ -14,7 +14,7 @@ TODO:
 - [ ] Cell paths
 - [ ] Row conditions
 - [ ] Records
-- [ ] Closures
+- [x] Closures
 - [ ] Shorthand flags in custom commands
 - [ ] Default args in custom commands
 - [ ] Aliases

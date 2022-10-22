@@ -78,6 +78,10 @@ pub enum NodeType {
         name: NodeId,
         ty: Option<NodeId>,
     },
+    Closure {
+        params: NodeId,
+        block: NodeId,
+    },
 
     // Expressions
     Call {
@@ -370,7 +374,7 @@ impl<'a> Parser<'a> {
 
     pub fn simple_expression(&mut self) -> NodeId {
         if self.is_lcurly() {
-            self.block()
+            self.block_or_closure()
         } else if self.is_lparen() {
             self.subexpression()
         } else if self.is_lsquare() {
@@ -521,11 +525,21 @@ impl<'a> Parser<'a> {
         (self.delta.span_start[from.0], self.delta.span_end[to.0])
     }
 
-    pub fn block(&mut self) -> NodeId {
+    pub fn block_or_closure(&mut self) -> NodeId {
         let span_start = self.position();
 
         self.lcurly();
-        let output = self.code_block(true);
+        let output = if self.is_pipe() {
+            // closure
+            let params = self.params();
+            let block = self.code_block(true);
+            let span_end = self.position();
+            self.create_node(NodeType::Closure { params, block }, span_start, span_end)
+        } else {
+            // block
+            self.code_block(true)
+        };
+
         self.rcurly();
 
         let span_end = self.position();
@@ -589,7 +603,7 @@ impl<'a> Parser<'a> {
         let params = self.params();
 
         self.skip_whitespace_and_comments();
-        let block = self.block();
+        let block = self.block_or_closure();
 
         let span_end = self.position();
 
@@ -615,7 +629,7 @@ impl<'a> Parser<'a> {
         let params = self.params();
 
         self.skip_whitespace_and_comments();
-        let block = self.block();
+        let block = self.block_or_closure();
 
         let span_end = self.position();
 
@@ -719,7 +733,7 @@ impl<'a> Parser<'a> {
         let condition = self.expression();
 
         self.skip_whitespace_and_comments();
-        let then_block = self.block();
+        let then_block = self.block_or_closure();
 
         self.skip_whitespace_and_comments();
         if self.is_keyword(b"else") {
@@ -965,6 +979,12 @@ impl<'a> Parser<'a> {
             self.rparen();
 
             output
+        } else if self.is_pipe() {
+            self.pipe();
+            let output = self.param_list();
+            self.pipe();
+
+            output
         } else {
             self.lsquare();
             let output = self.param_list();
@@ -981,7 +1001,8 @@ impl<'a> Parser<'a> {
     pub fn param_list(&mut self) -> Vec<NodeId> {
         let mut params = vec![];
         while self.has_tokens() {
-            if self.is_rparen() || self.is_rsquare() {
+            self.skip_space();
+            if self.is_rparen() || self.is_rsquare() || self.is_pipe() {
                 break;
             }
 
@@ -1062,6 +1083,20 @@ impl<'a> Parser<'a> {
             }
             _ => {
                 self.error(ParseErrorType::Expected("colon ':'".to_string()));
+            }
+        }
+    }
+
+    pub fn pipe(&mut self) {
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::Pipe,
+                ..
+            }) => {
+                self.lexer.next();
+            }
+            _ => {
+                self.error(ParseErrorType::Expected("pipe '|'".to_string()));
             }
         }
     }
@@ -1421,7 +1456,9 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("left brace '['".to_string()));
+                self.error(ParseErrorType::Expected(
+                    "left square bracket '['".to_string(),
+                ));
             }
         }
     }
@@ -1435,7 +1472,9 @@ impl<'a> Parser<'a> {
                 self.lexer.next();
             }
             _ => {
-                self.error(ParseErrorType::Expected("right brace ']'".to_string()));
+                self.error(ParseErrorType::Expected(
+                    "right square bracket ']'".to_string(),
+                ));
             }
         }
     }
