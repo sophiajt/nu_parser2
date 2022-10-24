@@ -94,6 +94,7 @@ pub enum NodeType {
         op: NodeId,
         rhs: NodeId,
     },
+    Table(Vec<NodeId>), // First element is headers, remainder are cells
     List(Vec<NodeId>),
     Block(Vec<NodeId>),
 
@@ -367,7 +368,7 @@ impl<'a> Parser<'a> {
         } else if self.is_lparen() {
             self.subexpression()
         } else if self.is_lsquare() {
-            self.list()
+            self.list_or_table()
         } else if self.is_keyword(b"true") || self.is_keyword(b"false") {
             self.boolean()
         } else if self.is_variable() {
@@ -557,9 +558,10 @@ impl<'a> Parser<'a> {
         output
     }
 
-    pub fn list(&mut self) -> NodeId {
+    pub fn list_or_table(&mut self) -> NodeId {
         let span_start = self.position();
 
+        let mut is_table = false;
         self.lsquare();
         let mut items = vec![];
         while self.has_tokens() {
@@ -574,11 +576,21 @@ impl<'a> Parser<'a> {
             }
 
             items.push(self.simple_expression());
+
+            self.skip_whitespace_and_comments();
+            if items.len() == 1 && self.is_semicolon() {
+                is_table = true;
+                self.lexer.next();
+            }
         }
 
         let span_end = self.position();
 
-        self.create_node(NodeType::List(items), span_start, span_end)
+        if is_table {
+            self.create_node(NodeType::Table(items), span_start, span_end)
+        } else {
+            self.create_node(NodeType::List(items), span_start, span_end)
+        }
     }
 
     pub fn def(&mut self) -> NodeId {
