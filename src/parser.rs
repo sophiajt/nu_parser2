@@ -294,8 +294,8 @@ impl<'a> Parser<'a> {
                 let rhs = if self.is_simple_expression() {
                     self.simple_expression()
                 } else {
-                    self.error(ShellErrorType::Expected(
-                        "complete math expression".to_string(),
+                    self.error(ShellErrorType::Incomplete(
+                        "math expression".to_string(),
                     ))
                 };
 

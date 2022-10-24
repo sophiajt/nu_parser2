@@ -28,6 +28,7 @@ impl MessageSeverity {
 #[derive(Debug)]
 pub enum ShellErrorType {
     Expected(String),
+    Incomplete(String),
 }
 
 #[derive(Debug)]
@@ -44,7 +45,17 @@ impl ShellError {
                 MessageSeverity::Error,
                 filename,
                 file_contents,
-                message,
+                &format!("expected {}", message),
+                Span {
+                    start: self.span_start,
+                    end: self.span_end,
+                },
+            ),
+            ShellErrorType::Incomplete(message) => display_message_with_span(
+                MessageSeverity::Error,
+                filename,
+                file_contents,
+                &format!("incomplete {}", message),
                 Span {
                     start: self.span_start,
                     end: self.span_end,
