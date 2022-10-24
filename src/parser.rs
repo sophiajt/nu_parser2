@@ -5,8 +5,42 @@ use crate::{
 };
 
 #[derive(Debug)]
+pub enum Unit {
+    // Filesize units: metric
+    Byte,
+    Kilobyte,
+    Megabyte,
+    Gigabyte,
+    Terabyte,
+    Petabyte,
+    Exabyte,
+    Zettabyte,
+
+    // Filesize units: ISO/IEC 80000
+    Kibibyte,
+    Mebibyte,
+    Gibibyte,
+    Tebibyte,
+    Pebibyte,
+    Exbibyte,
+    Zebibyte,
+
+    // Duration units
+    Nanosecond,
+    Microsecond,
+    Millisecond,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+}
+
+#[derive(Debug)]
 pub enum NodeType {
     Int,
+    Float,
+    Unit(Unit),
     String,
     Name,
     Bareword,
@@ -295,9 +329,7 @@ impl<'a> Parser<'a> {
                 let rhs = if self.is_simple_expression() {
                     self.simple_expression()
                 } else {
-                    self.error(ShellErrorType::Incomplete(
-                        "math expression".to_string(),
-                    ))
+                    self.error(ShellErrorType::Incomplete("math expression".to_string()))
                 };
 
                 while op_prec <= last_prec && expr_stack.len() > 1 {
@@ -1590,11 +1622,56 @@ impl<'a> Parser<'a> {
                 token_type: TokenType::Number,
                 span_start,
                 span_end,
-                ..
+                contents,
             }) => {
                 self.lexer.next();
 
-                self.create_node(NodeType::Int, span_start, span_end)
+                match self.lexer.peek() {
+                    Some(Token {
+                        token_type: TokenType::Bareword,
+                        contents,
+                        ..
+                    }) => {
+                        let unit = match &contents.to_ascii_lowercase()[..] {
+                            b"b" => Unit::Byte,
+                            b"kb" => Unit::Kilobyte,
+                            b"kib" => Unit::Kibibyte,
+                            b"mb" => Unit::Megabyte,
+                            b"mib" => Unit::Mebibyte,
+                            b"gb" => Unit::Gigabyte,
+                            b"gib" => Unit::Gibibyte,
+                            b"tb" => Unit::Terabyte,
+                            b"tib" => Unit::Tebibyte,
+                            b"pb" => Unit::Petabyte,
+                            b"pib" => Unit::Pebibyte,
+                            b"eb" => Unit::Exabyte,
+                            b"eib" => Unit::Exbibyte,
+                            b"zb" => Unit::Zettabyte,
+                            b"zib" => Unit::Zebibyte,
+                            b"ns" => Unit::Nanosecond,
+                            b"us" => Unit::Microsecond,
+                            b"ms" => Unit::Millisecond,
+                            b"sec" => Unit::Second,
+                            b"min" => Unit::Minute,
+                            b"hr" => Unit::Hour,
+                            b"day" => Unit::Day,
+                            b"wk" => Unit::Week,
+                            _ => {
+                                return self
+                                    .error(ShellErrorType::Expected("unit for value".into()))
+                            }
+                        };
+                        self.lexer.next();
+                        self.create_node(NodeType::Unit(unit), span_start, span_end)
+                    }
+                    _ => {
+                        if contents.contains(&b'.') {
+                            self.create_node(NodeType::Float, span_start, span_end)
+                        } else {
+                            self.create_node(NodeType::Int, span_start, span_end)
+                        }
+                    }
+                }
             }
             _ => self.error(ShellErrorType::Expected("number".to_string())),
         }
