@@ -5,7 +5,7 @@ This experiment hopes to grow to replace Nushell's current parser.
 TODO:
 
 - [x] Tables
-- [ ] Units
+- [x] Units
 - [ ] Binary literals
 - [x] Floats
 - [x] Hex, octal, binary integer values
