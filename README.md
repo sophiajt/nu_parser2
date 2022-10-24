@@ -7,8 +7,8 @@ TODO:
 - [x] Tables
 - [ ] Units
 - [ ] Binary literals
-- [ ] Floats
-- [ ] Hex, octal, binary integer values
+- [x] Floats
+- [x] Hex, octal, binary integer values
 - [ ] Ranges
 - [ ] String interpolation
 - [ ] Cell paths
