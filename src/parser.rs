@@ -1593,6 +1593,7 @@ impl<'a> Parser<'a> {
                 ..
             }) => {
                 self.lexer.next();
+
                 self.create_node(NodeType::Int, span_start, span_end)
             }
             _ => self.error(ShellErrorType::Expected("number".to_string())),

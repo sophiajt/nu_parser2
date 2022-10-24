@@ -165,6 +165,58 @@ impl<'a> Lexer<'a> {
             token_offset += 1;
         }
 
+        // Check to see if we have a hex/octal/binary number
+        if token_offset < self.source.len() && self.source[token_offset] == b'x' {
+            token_offset += 1;
+            while token_offset < self.source.len() {
+                if !self.source[token_offset].is_ascii_hexdigit() {
+                    break;
+                }
+                token_offset += 1;
+            }
+        } else if token_offset < self.source.len() && self.source[token_offset] == b'o' {
+            token_offset += 1;
+            while token_offset < self.source.len() {
+                if !(self.source[token_offset] >= b'0' && self.source[token_offset] <= b'7') {
+                    break;
+                }
+                token_offset += 1;
+            }
+        } else if token_offset < self.source.len() && self.source[token_offset] == b'b' {
+            token_offset += 1;
+            while token_offset < self.source.len() {
+                if !(self.source[token_offset] >= b'0' && self.source[token_offset] <= b'1') {
+                    break;
+                }
+                token_offset += 1;
+            }
+        } else if token_offset < self.source.len() && self.source[token_offset] == b'.' {
+            token_offset += 1;
+            while token_offset < self.source.len() {
+                if !self.source[token_offset].is_ascii_digit() {
+                    break;
+                }
+                token_offset += 1;
+            }
+
+            if token_offset < self.source.len()
+                && (self.source[token_offset] == b'e' || self.source[token_offset] == b'E')
+            {
+                token_offset += 1;
+
+                if token_offset < self.source.len() && self.source[token_offset] == b'-' {
+                    token_offset += 1;
+                }
+
+                while token_offset < self.source.len() {
+                    if !self.source[token_offset].is_ascii_digit() {
+                        break;
+                    }
+                    token_offset += 1;
+                }
+            }
+        }
+
         self.span_offset += token_offset;
 
         let contents = &self.source[..token_offset];
