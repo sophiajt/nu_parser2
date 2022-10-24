@@ -190,7 +190,12 @@ impl<'a> Lexer<'a> {
                 }
                 token_offset += 1;
             }
-        } else if token_offset < self.source.len() && self.source[token_offset] == b'.' {
+        } else if token_offset < self.source.len()
+            && self.source[token_offset] == b'.'
+            && (token_offset + 1 < self.source.len())
+            && self.source[token_offset + 1].is_ascii_digit()
+        {
+            // Looks like a float
             token_offset += 1;
             while token_offset < self.source.len() {
                 if !self.source[token_offset].is_ascii_digit() {

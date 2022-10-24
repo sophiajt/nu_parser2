@@ -128,6 +128,10 @@ pub enum NodeType {
         op: NodeId,
         rhs: NodeId,
     },
+    Range {
+        lhs: NodeId,
+        rhs: NodeId,
+    },
     Table(Vec<NodeId>), // First element is headers, remainder are cells
     List(Vec<NodeId>),
     Block(Vec<NodeId>),
@@ -395,7 +399,9 @@ impl<'a> Parser<'a> {
     }
 
     pub fn simple_expression(&mut self) -> NodeId {
-        if self.is_lcurly() {
+        let span_start = self.position();
+
+        let expr = if self.is_lcurly() {
             self.block_or_closure()
         } else if self.is_lparen() {
             self.subexpression()
@@ -412,7 +418,19 @@ impl<'a> Parser<'a> {
         } else {
             let bare_string = self.bareword();
             self.delta.node_types[bare_string.0] = NodeType::String;
-            bare_string
+            return bare_string;
+        };
+
+        if self.is_dotdot() {
+            // Range
+            self.lexer.next();
+
+            let rhs = self.simple_expression();
+            let span_end = self.position();
+
+            self.create_node(NodeType::Range { lhs: expr, rhs }, span_start, span_end)
+        } else {
+            expr
         }
     }
 
@@ -1327,6 +1345,26 @@ impl<'a> Parser<'a> {
             self.lexer.peek(),
             Some(Token {
                 token_type: TokenType::Semicolon,
+                ..
+            })
+        )
+    }
+
+    pub fn is_dot(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::Dot,
+                ..
+            })
+        )
+    }
+
+    pub fn is_dotdot(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::DotDot,
                 ..
             })
         )

@@ -9,7 +9,7 @@ TODO:
 - [ ] Binary literals
 - [x] Floats
 - [x] Hex, octal, binary integer values
-- [ ] Ranges
+- [x] Ranges
 - [ ] String interpolation
 - [ ] Cell paths
 - [ ] Row conditions

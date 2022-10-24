@@ -192,6 +192,15 @@ impl ParserDelta {
                 self.print_helper(op, indent + 2);
                 self.print_helper(rhs, indent + 2)
             }
+            NodeType::Range { lhs, rhs } => {
+                println!(
+                    "Range ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(lhs, indent + 2);
+                self.print_helper(rhs, indent + 2)
+            }
             NodeType::BashAnd { lhs, rhs } => {
                 println!(
                     "BashAnd ({}, {}):",
