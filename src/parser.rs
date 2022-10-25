@@ -168,6 +168,10 @@ pub enum NodeType {
     },
     Where(NodeId),
     Garbage,
+
+    // REPL Bashisms
+    BangBang,
+    BangDollar,
 }
 
 impl NodeType {
@@ -250,6 +254,9 @@ impl<'a> Parser<'a> {
             } else if self.is_semicolon() {
                 self.lexer.next();
                 continue;
+            } else if self.is_repl_bashism() {
+                let result = self.repl_bashism();
+                code_body.push(result);
             } else {
                 let result = self.statement_or_definition();
                 code_body.push(result);
@@ -888,6 +895,45 @@ impl<'a> Parser<'a> {
         let span_end = self.position();
 
         self.create_node(NodeType::Where(condition), span_start, span_end)
+    }
+
+    pub fn repl_bashism(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        if self.is_bangbang() {
+            self.lexer.next();
+            let span_end = self.position();
+            return self.create_node(NodeType::BangBang, span_start, span_end);
+        } else if self.is_bangdollar() {
+            self.lexer.next();
+            let span_end = self.position();
+            return self.create_node(NodeType::BangDollar, span_start, span_end);
+        } else {
+            return self.error(ShellErrorType::Expected("bashsim elements".to_string()));
+        }
+    }
+    pub fn is_repl_bashism(&mut self) -> bool {
+        self.is_bangbang() || self.is_bangdollar()
+    }
+
+    pub fn is_bangbang(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::BangBang,
+                ..
+            })
+        )
+    }
+
+    pub fn is_bangdollar(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::BangDollar,
+                ..
+            })
+        )
     }
 
     pub fn pipeline(&mut self) -> NodeId {

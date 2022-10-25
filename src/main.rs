@@ -1,6 +1,7 @@
 // Ideas:
 // Lex+Parse in the same struct?
 // Create the delta where the delta is an SOA
+#![allow(unused)]
 
 mod lexer;
 mod parser;

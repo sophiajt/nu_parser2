@@ -51,6 +51,8 @@ pub enum TokenType {
     Ampersand,
     AmpersandAmpersand,
     Bareword,
+    BangBang,
+    BangDollar,
 }
 
 #[derive(Debug)]
@@ -520,6 +522,20 @@ impl<'a> Lexer<'a> {
                 } else if self.source.len() > 1 && self.source[1] == b'~' {
                     Token {
                         token_type: TokenType::ExclamationTilde,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else if self.source.len() > 1 && self.source[1] == b'!' {
+                    Token {
+                        token_type: TokenType::BangBang,
+                        contents: &self.source[..2],
+                        span_start,
+                        span_end: span_start + 2,
+                    }
+                } else if self.source.len() > 1 && self.source[1] == b'$' {
+                    Token {
+                        token_type: TokenType::BangDollar,
                         contents: &self.source[..2],
                         span_start,
                         span_end: span_start + 2,
