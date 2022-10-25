@@ -45,7 +45,7 @@ When parsing is executed, `parse()` is called, which in turn calls `program()`, 
 A few things to note about the parser:
 
 * The parser has one step of look-ahead (via `.peek()`). If you need to make a parsing decision between two paths, for example between parsing a list and a table, you'll need to put the parsing choice right at the point the parser would know if it was one or the other. This grammar does not work like a PEG grammar, which may have a long lookahead.
-* Everything is interned in the parser into a struct-of-arrays/entity component system (ECS). The `NodeId` is the key for the components like node type, span, etc. 
+* Everything is interned in the parser into a struct-of-arrays. The `NodeId` is the key for the components like node type, span, etc. 
 
 These changes need to happen in parser.rs.
 
