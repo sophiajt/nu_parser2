@@ -11,7 +11,7 @@ TODO:
 - [x] Hex, octal, binary integer values
 - [x] Ranges
 - [ ] String interpolation
-- [ ] Cell paths
+- [x] Cell paths
 - [ ] Row conditions
 - [ ] Records
 - [x] Closures
@@ -24,6 +24,7 @@ TODO:
 - [x] Comments
 - [ ] Attaching comments to parsed nodes
 - [ ] Date literals (new kind)
+- [ ] Match expressions
 
 # Adding new grammar element
 
@@ -39,15 +40,16 @@ These changes need to happen in lexer.rs.
 
 Parsing is similar to lexing in that it segments text into `NodeTypes` with location spans, in order to understand the meaning of the source code, by breaking down the component parts, looking for specific sequences or rules, for execution.
 
-When parsing is executed, `parse()` is called, which in turn calls `program()`, which in turn calls `code_block()`. It's important to follow this trail to ensure that your new grammar is parsed. If your new grammar is not called out in one of the conditional items in `code_block()`, then your new grammar won't be parsed.
+When parsing is executed, `parse()` is called, which in turn calls `program()`, which in turn calls `code_block()`. You can follow this much in the same way as using a grammar.
 
-For instance, if you were adding a new item to locate the three stooges, `moe`, `larry`, `curly`. You'd have to have call a function like `self.is_stooge()` somewhere in the code block to check if the current text is a stooge or not. Then, separately, you need to create a `stooge()` function in order to create a `NodeId` for the current stooge.
+A few things to note about the parser:
 
-Note that `rcurly` and `lcurly` do not refer to the last stooge. :)
+* The parser has one step of look-ahead (via `.peek()`). If you need to make a parsing decision between two paths, for example between parsing a list and a table, you'll need to put the parsing choice right at the point the parser would know if it was one or the other. This grammar does not work like a PEG grammar, which may have a long lookahead.
+* Everything is interned in the parser into a struct-of-arrays/entity component system (ECS). The `NodeId` is the key for the components like node type, span, etc. 
 
 These changes need to happen in parser.rs.
 
 1. Add a `NodeType` to the enum.
-2. Add a `is_your_node_type` to the code to detect if the current text is your new type.
-3. Add a `your_token_type` to the code to create a `NodeId` with spans.
+2. Add a `is_your_node_type` (eg `is_match_expression`) to the code to detect if the current text is your new type.
+3. Add a `your_node_type()` (eg `match_expression()`) to the code to create a `NodeId` with spans.
 
