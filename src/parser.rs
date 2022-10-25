@@ -158,6 +158,14 @@ pub enum NodeType {
         then_block: NodeId,
         else_expression: Option<NodeId>,
     },
+    ColumnPath {
+        head: NodeId,
+        path: NodeId,
+    },
+    RowPath {
+        head: NodeId,
+        path: NodeId,
+    },
     Where(NodeId),
     Garbage,
 }
@@ -421,7 +429,9 @@ impl<'a> Parser<'a> {
             return bare_string;
         };
 
-        if self.is_dotdot() {
+        if self.is_dot() {
+            self.cell_path(expr, span_start)
+        } else if self.is_dotdot() {
             // Range
             self.lexer.next();
 
@@ -588,6 +598,67 @@ impl<'a> Parser<'a> {
         self.delta.span_end[output.0] = span_end;
 
         output
+    }
+
+    pub fn cell_path(&mut self, mut head: NodeId, span_start: usize) -> NodeId {
+        if self.is_dot() {
+            while self.is_dot() {
+                self.lexer.next();
+                match self.lexer.peek() {
+                    Some(Token {
+                        token_type: TokenType::Number,
+                        span_end,
+                        ..
+                    }) => {
+                        let path = self.number();
+                        head =
+                            self.create_node(NodeType::RowPath { head, path }, span_start, span_end)
+                    }
+                    Some(Token {
+                        token_type: TokenType::Bareword,
+                        span_end,
+                        ..
+                    }) => {
+                        let path = self.bareword();
+                        head = self.create_node(
+                            NodeType::ColumnPath { head, path },
+                            span_start,
+                            span_end,
+                        )
+                    }
+                    Some(Token {
+                        token_type: TokenType::SimpleString,
+                        span_end,
+                        ..
+                    }) => {
+                        let path = self.string();
+                        head = self.create_node(
+                            NodeType::ColumnPath { head, path },
+                            span_start,
+                            span_end,
+                        )
+                    }
+                    Some(Token {
+                        token_type: TokenType::String,
+                        span_end,
+                        ..
+                    }) => {
+                        let path = self.string();
+                        head = self.create_node(
+                            NodeType::ColumnPath { head, path },
+                            span_start,
+                            span_end,
+                        )
+                    }
+                    _ => {
+                        return self.error(ShellErrorType::Expected("compatible cell path".into()))
+                    }
+                }
+            }
+            head
+        } else {
+            self.error(ShellErrorType::Expected("dot '.'".into()))
+        }
     }
 
     pub fn subexpression(&mut self) -> NodeId {

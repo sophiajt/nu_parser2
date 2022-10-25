@@ -201,6 +201,24 @@ impl ParserDelta {
                 self.print_helper(lhs, indent + 2);
                 self.print_helper(rhs, indent + 2)
             }
+            NodeType::RowPath { head, path } => {
+                println!(
+                    "RowPath ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(head, indent + 2);
+                self.print_helper(path, indent + 2)
+            }
+            NodeType::ColumnPath { head, path } => {
+                println!(
+                    "ColumnPath ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                self.print_helper(head, indent + 2);
+                self.print_helper(path, indent + 2)
+            }
             NodeType::BashAnd { lhs, rhs } => {
                 println!(
                     "BashAnd ({}, {}):",

@@ -11,7 +11,7 @@ TODO:
 - [x] Hex, octal, binary integer values
 - [x] Ranges
 - [ ] String interpolation
-- [ ] Cell paths
+- [x] Cell paths
 - [ ] Row conditions
 - [ ] Records
 - [x] Closures
