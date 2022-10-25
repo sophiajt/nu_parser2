@@ -10,7 +10,6 @@ mod shell_error;
 use std::io::Read;
 
 use parser::Parser;
-use shell_error::ShellErrorType;
 
 fn main() -> std::io::Result<()> {
     for filename in std::env::args().skip(1) {
