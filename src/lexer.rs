@@ -21,6 +21,7 @@ pub enum TokenType {
     DotDot,
     Dollar,
     Variable,
+    Interpolation,
     Pipe,
     PipePipe,
     Colon,
@@ -64,7 +65,7 @@ pub struct Token<'a> {
 fn is_symbol(b: u8) -> bool {
     [
         b'+', b'-', b'*', b'/', b'.', b',', b'(', b'[', b'{', b'<', b')', b']', b'}', b'>', b':',
-        b';', b'=', b'$', b'|', b'!', b'~', b'&',
+        b';', b'=', b'$', b'|', b'!', b'~', b'&', b'\'', b'"',
     ]
     .contains(&b)
 }
@@ -142,7 +143,7 @@ impl<'a> Lexer<'a> {
             token_offset += 1;
         }
 
-        self.span_offset += token_offset - 1;
+        self.span_offset += token_offset;
 
         let contents = &self.source[1..(token_offset - 1)];
         self.source = &self.source[token_offset..];
@@ -277,29 +278,54 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    pub fn lex_variable(&mut self) -> Option<Token<'a>> {
+    pub fn lex_dollar_expression(&mut self) -> Option<Token<'a>> {
         let span_start = self.span_offset;
-        self.span_offset += 1;
 
         let mut token_offset = 1;
-        while token_offset < self.source.len() {
-            if self.source[token_offset].is_ascii_whitespace()
-                || is_symbol(self.source[token_offset])
-            {
-                break;
+        if self.source.len() > token_offset && !self.source[token_offset].is_ascii_whitespace() && !is_symbol(self.source[token_offset]) {
+            while token_offset < self.source.len() {
+                if self.source[token_offset].is_ascii_whitespace()
+                    || is_symbol(self.source[token_offset])
+                {
+                    break;
+                }
+                token_offset += 1;
             }
-            token_offset += 1;
+            self.span_offset += token_offset;
+            let contents = &self.source[..token_offset];
+            self.source = &self.source[token_offset..];
+    
+            Some(Token {
+                token_type: TokenType::Variable,
+                contents,
+                span_start,
+                span_end: self.span_offset,
+            })    
+        } else if self.source.len() > token_offset && self.source[token_offset] == b'\'' {
+            self.span_offset += 1;
+            self.source = &self.source[1..];
+            self.lex_single_quoted_string().map(|x| {
+                Token {
+                    token_type: TokenType::Interpolation,
+                    span_start,
+                    ..x
+                }
+            })
+        } else if self.source.len() > token_offset && self.source[token_offset] == b'"' {
+            self.span_offset += 1;
+            self.source = &self.source[1..];
+            self.lex_quoted_string().map(|x| {
+                Token {
+                    token_type: TokenType::Interpolation,
+                    span_start,
+                    ..x
+                }
+            })
+        } else {
+            self.span_offset += 1;
+            self.source = &self.source[1..];
+            Some(Token { token_type: TokenType::Dollar, span_start, span_end: self.span_offset, contents: &[b'$']})
         }
-        self.span_offset += token_offset;
-        let contents = &self.source[..token_offset];
-        self.source = &self.source[token_offset..];
-
-        Some(Token {
-            token_type: TokenType::Variable,
-            contents,
-            span_start,
-            span_end: self.span_offset,
-        })
     }
 
     pub fn lex_comment(&mut self) -> Option<Token<'a>> {
@@ -637,6 +663,17 @@ impl<'a> Lexer<'a> {
         output
     }
 
+    pub fn peek_two_tokens(&mut self) -> (Option<Token<'a>>, Option<Token<'a>>) {
+        let prev_offset = self.span_offset;
+        let prev_source = self.source;
+        let output1 = self.next();
+        let output2 = self.next();
+        self.span_offset = prev_offset;
+        self.source = prev_source;
+
+        (output1, output2)
+    }
+
     pub fn next(&mut self) -> Option<Token<'a>> {
         if self.source.is_empty() {
             None
@@ -655,7 +692,7 @@ impl<'a> Lexer<'a> {
         {
             self.lex_space()
         } else if self.source[0] == b'$' {
-            self.lex_variable()
+            self.lex_dollar_expression()
         } else if is_symbol(self.source[0]) {
             self.lex_symbol()
         } else if self.source[0] == b'\n' {

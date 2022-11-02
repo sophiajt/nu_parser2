@@ -82,6 +82,7 @@ pub enum NodeType {
     ShiftRight,
     StartsWith,
     EndsWith,
+    Interpolation,
 
     // Statements
     Let {
@@ -135,6 +136,11 @@ pub enum NodeType {
     Table(Vec<NodeId>), // First element is headers, remainder are cells
     List(Vec<NodeId>),
     Block(Vec<NodeId>),
+    Record(Vec<NodeId>),
+    RecordField {
+        label: NodeId,
+        value: NodeId,
+    },
 
     // Shell-specific
     Pipeline {
@@ -262,9 +268,11 @@ impl<'a> Parser<'a> {
                     && !self.is_comment()
                     && self.has_tokens()
                 {
-                    self.error(ShellErrorType::Expected(
-                        "new line or semicolon".to_string(),
-                    ));
+                    let p = self.lexer.peek();
+                    self.error(ShellErrorType::Expected(format!(
+                        "new line or semicolon (found {:?})",
+                        p
+                    )));
                 }
             }
         }
@@ -410,7 +418,7 @@ impl<'a> Parser<'a> {
         let span_start = self.position();
 
         let expr = if self.is_lcurly() {
-            self.block_or_closure()
+            self.block_or_closure_or_record()
         } else if self.is_lparen() {
             self.subexpression()
         } else if self.is_lsquare() {
@@ -423,6 +431,8 @@ impl<'a> Parser<'a> {
             self.string()
         } else if self.is_number() {
             self.number()
+        } else if self.is_interpolation() {
+            self.interpolation()
         } else {
             let bare_string = self.bareword();
             self.delta.node_types[bare_string.0] = NodeType::String;
@@ -575,7 +585,7 @@ impl<'a> Parser<'a> {
         (self.delta.span_start[from.0], self.delta.span_end[to.0])
     }
 
-    pub fn block_or_closure(&mut self) -> NodeId {
+    pub fn block_or_closure_or_record(&mut self) -> NodeId {
         let span_start = self.position();
 
         self.lcurly();
@@ -586,8 +596,19 @@ impl<'a> Parser<'a> {
             let span_end = self.position();
             self.create_node(NodeType::Closure { params, block }, span_start, span_end)
         } else {
-            // block
-            self.code_block(true)
+            match self.lexer.peek_two_tokens() {
+                (
+                    Some(Token {
+                        token_type: TokenType::Bareword,
+                        ..
+                    }),
+                    Some(Token {
+                        token_type: TokenType::Colon,
+                        ..
+                    }),
+                ) => self.record(),
+                _ => self.code_block(true),
+            }
         };
 
         self.rcurly();
@@ -714,6 +735,61 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn record(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        let mut fields = vec![];
+        while self.has_tokens() {
+            self.skip_whitespace_and_comments();
+            if self.is_rcurly() {
+                break;
+            }
+            if self.is_comma() {
+                self.lexer.next();
+                continue;
+            }
+
+            self.skip_whitespace_and_comments();
+
+            let field_start = self.position();
+            let label = self.simple_expression();
+
+            self.skip_whitespace_and_comments();
+            if self.is_colon() {
+                // field with value
+                self.lexer.next();
+                self.skip_whitespace_and_comments();
+                let value = self.simple_expression();
+
+                let field_end = self.position();
+
+                fields.push(self.create_node(
+                    NodeType::RecordField { label, value },
+                    field_start,
+                    field_end,
+                ))
+            } else {
+                // field with value from variable with same name
+                let field_end = self.position();
+
+                // FIXME: change this into a variable?
+
+                fields.push(self.create_node(
+                    NodeType::RecordField {
+                        label,
+                        value: label,
+                    },
+                    field_start,
+                    field_end,
+                ))
+            }
+        }
+
+        let span_end = self.position();
+
+        self.create_node(NodeType::Record(fields), span_start, span_end)
+    }
+
     pub fn def(&mut self) -> NodeId {
         let span_start = self.position();
         self.keyword(b"def");
@@ -725,7 +801,7 @@ impl<'a> Parser<'a> {
         let params = self.params();
 
         self.skip_whitespace_and_comments();
-        let block = self.block_or_closure();
+        let block = self.block_or_closure_or_record();
 
         let span_end = self.position();
 
@@ -751,7 +827,7 @@ impl<'a> Parser<'a> {
         let params = self.params();
 
         self.skip_whitespace_and_comments();
-        let block = self.block_or_closure();
+        let block = self.block_or_closure_or_record();
 
         let span_end = self.position();
 
@@ -855,7 +931,7 @@ impl<'a> Parser<'a> {
         let condition = self.expression();
 
         self.skip_whitespace_and_comments();
-        let then_block = self.block_or_closure();
+        let then_block = self.block_or_closure_or_record();
 
         self.skip_whitespace_and_comments();
         if self.is_keyword(b"else") {
@@ -1531,6 +1607,16 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn is_interpolation(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::Interpolation,
+                ..
+            })
+        )
+    }
+
     pub fn is_name(&mut self) -> bool {
         matches!(
             self.lexer.peek(),
@@ -1557,6 +1643,10 @@ impl<'a> Parser<'a> {
             })
             | Some(Token {
                 token_type: TokenType::SimpleString,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::Interpolation,
                 ..
             })
             | Some(Token {
@@ -1807,6 +1897,21 @@ impl<'a> Parser<'a> {
                 self.create_node(NodeType::String, span_start, span_end)
             }
             _ => self.error(ShellErrorType::Expected("string".to_string())),
+        }
+    }
+
+    pub fn interpolation(&mut self) -> NodeId {
+        match self.lexer.peek() {
+            Some(Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                span_end,
+                ..
+            }) => {
+                self.lexer.next();
+                self.create_node(NodeType::Interpolation, span_start, span_end)
+            }
+            _ => self.error(ShellErrorType::Expected("string interpolation".to_string())),
         }
     }
 

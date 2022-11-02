@@ -164,6 +164,24 @@ impl ParserDelta {
                     self.print_helper(item, indent + 2);
                 }
             }
+            NodeType::Record(items) => {
+                println!(
+                    "Record ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+
+                for item in items {
+                    self.print_helper(item, indent + 2);
+                }
+            }
+            NodeType::RecordField { label, value } => {
+                println!(
+                    "Field ({}, {}):",
+                    self.span_start[node_id.0], self.span_end[node_id.0],
+                );
+                self.print_helper(label, indent + 2);
+                self.print_helper(value, indent + 2)
+            }
             NodeType::Pipeline { from, to } => {
                 println!(
                     "Pipeline ({}, {}):",

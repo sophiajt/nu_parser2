@@ -10,10 +10,10 @@ TODO:
 - [x] Floats
 - [x] Hex, octal, binary integer values
 - [x] Ranges
-- [ ] String interpolation
+- [x] String interpolation
 - [x] Cell paths
-- [ ] Row conditions
-- [ ] Records
+- [x] Row conditions (will be handled by the typechecker)
+- [x] Records
 - [x] Closures
 - [ ] Shorthand flags in custom commands
 - [ ] Default args in custom commands

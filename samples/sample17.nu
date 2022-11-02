@@ -11,3 +11,9 @@ $y."b".0
 $y.'b'.0
 
 $y.`b`.0
+
+$"foo bar"
+
+$'qux bar'
+
+{foo: 2, bar}
