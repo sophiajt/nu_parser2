@@ -97,6 +97,11 @@ pub enum NodeType {
         variable_name: NodeId,
         initializer: NodeId,
     },
+    Alias {
+        alias_name: NodeId,
+        replacement: NodeId,
+    },
+    AliasStandalone,
 
     // Definitions
     Def {
@@ -298,6 +303,8 @@ impl<'a> Parser<'a> {
             self.let_env_statement()
         } else if self.is_keyword(b"mut") {
             self.mut_statement()
+        } else if self.is_keyword(b"alias") {
+            self.alias_statement()
         } else if self.is_expression() {
             self.expression()
         } else {
@@ -918,6 +925,37 @@ impl<'a> Parser<'a> {
             span_start,
             span_end,
         )
+    }
+
+    pub fn alias_statement(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        self.keyword(b"alias");
+        self.skip_whitespace_and_comments();
+
+        if !self.has_tokens() {
+            let span_end = self.position();
+            self.create_node(NodeType::AliasStandalone, span_start, span_end)
+        } else {
+            let alias_name = self.name();
+
+            self.skip_whitespace_and_comments();
+            self.equals();
+
+            self.skip_whitespace_and_comments();
+            let replacement = self.expression_or_pipeline();
+
+            let span_end = self.position();
+
+            self.create_node(
+                NodeType::Alias {
+                    alias_name,
+                    replacement,
+                },
+                span_start,
+                span_end,
+            )
+        }
     }
 
     pub fn if_expression(&mut self) -> NodeId {
