@@ -282,7 +282,10 @@ impl<'a> Lexer<'a> {
         let span_start = self.span_offset;
 
         let mut token_offset = 1;
-        if self.source.len() > token_offset && !self.source[token_offset].is_ascii_whitespace() && !is_symbol(self.source[token_offset]) {
+        if self.source.len() > token_offset
+            && !self.source[token_offset].is_ascii_whitespace()
+            && !is_symbol(self.source[token_offset])
+        {
             while token_offset < self.source.len() {
                 if self.source[token_offset].is_ascii_whitespace()
                     || is_symbol(self.source[token_offset])
@@ -294,37 +297,38 @@ impl<'a> Lexer<'a> {
             self.span_offset += token_offset;
             let contents = &self.source[..token_offset];
             self.source = &self.source[token_offset..];
-    
+
             Some(Token {
                 token_type: TokenType::Variable,
                 contents,
                 span_start,
                 span_end: self.span_offset,
-            })    
+            })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'\'' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_single_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_single_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'"' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            Some(Token { token_type: TokenType::Dollar, span_start, span_end: self.span_offset, contents: &[b'$']})
+            Some(Token {
+                token_type: TokenType::Dollar,
+                span_start,
+                span_end: self.span_offset,
+                contents: &[b'$'],
+            })
         }
     }
 
