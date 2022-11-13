@@ -706,9 +706,11 @@ impl<'a> Parser<'a> {
         let mut is_table = false;
         self.lsquare();
         let mut items = vec![];
+        let mut no_rsquare = true;
         while self.has_tokens() {
             self.skip_whitespace_and_comments();
             if self.is_rsquare() {
+                no_rsquare = false;
                 self.lexer.next();
                 break;
             }
@@ -727,8 +729,11 @@ impl<'a> Parser<'a> {
         }
 
         let span_end = self.position();
-
-        if is_table {
+        if no_rsquare {
+            self.error(ShellErrorType::Expected(
+                "right square bracket ']'".to_string(),
+            ))
+        } else if is_table {
             self.create_node(NodeType::Table(items), span_start, span_end)
         } else {
             self.create_node(NodeType::List(items), span_start, span_end)
