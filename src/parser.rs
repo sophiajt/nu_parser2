@@ -40,6 +40,7 @@ pub enum Unit {
 pub enum NodeType {
     Int,
     Float,
+    BinaryLiterial,
     Unit(Unit),
     String,
     Name,
@@ -421,6 +422,8 @@ impl<'a> Parser<'a> {
             self.block_or_closure_or_record()
         } else if self.is_lparen() {
             self.subexpression()
+        } else if self.is_binary_literial() {
+            self.binary_literial()
         } else if self.is_lsquare() {
             self.list_or_table()
         } else if self.is_keyword(b"true") || self.is_keyword(b"false") {
@@ -698,6 +701,16 @@ impl<'a> Parser<'a> {
         self.delta.span_end[output.0] = span_end;
 
         output
+    }
+
+    pub fn binary_literial(&mut self) -> NodeId {
+        let span_start = self.position();
+
+        self.lexer.lex_binary_literial();
+        self.rsquare();
+
+        let span_end = self.position();
+        self.create_node(NodeType::BinaryLiterial, span_start, span_end)
     }
 
     pub fn list_or_table(&mut self) -> NodeId {
@@ -1627,6 +1640,16 @@ impl<'a> Parser<'a> {
         )
     }
 
+    pub fn is_binary_literial(&mut self) -> bool {
+        matches!(
+            self.lexer.peek(),
+            Some(Token {
+                token_type: TokenType::BinaryLiterial,
+                ..
+            })
+        )
+    }
+
     pub fn is_expression(&mut self) -> bool {
         self.is_simple_expression() || self.is_keyword(b"if") || self.is_keyword(b"where")
     }
@@ -1635,6 +1658,10 @@ impl<'a> Parser<'a> {
         match self.lexer.peek() {
             Some(Token {
                 token_type: TokenType::Number,
+                ..
+            })
+            | Some(Token {
+                token_type: TokenType::BinaryLiterial,
                 ..
             })
             | Some(Token {

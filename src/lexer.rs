@@ -11,6 +11,7 @@ pub struct Lexer<'a> {
 #[derive(Debug)]
 pub enum TokenType {
     Number,
+    BinaryLiterial,
     Space,
     Newline,
     Comma,
@@ -68,6 +69,10 @@ fn is_symbol(b: u8) -> bool {
         b';', b'=', b'$', b'|', b'!', b'~', b'&', b'\'', b'"',
     ]
     .contains(&b)
+}
+
+fn is_binary_literial(source: &[u8]) -> bool {
+    source.len() > 2 && source[0] == b'0' && source[1] == b'b' && source[2] == b'['
 }
 
 impl<'a> Lexer<'a> {
@@ -278,11 +283,37 @@ impl<'a> Lexer<'a> {
         })
     }
 
+    pub fn lex_binary_literial(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+
+        let mut token_offset = 3;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] != b'0' && self.source[token_offset] != b'1' {
+                break;
+            }
+            token_offset += 1;
+        }
+        self.span_offset += token_offset;
+
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::BinaryLiterial,
+            contents,
+            span_start,
+            span_end: self.span_offset,
+        })
+    }
+
     pub fn lex_dollar_expression(&mut self) -> Option<Token<'a>> {
         let span_start = self.span_offset;
 
         let mut token_offset = 1;
-        if self.source.len() > token_offset && !self.source[token_offset].is_ascii_whitespace() && !is_symbol(self.source[token_offset]) {
+        if self.source.len() > token_offset
+            && !self.source[token_offset].is_ascii_whitespace()
+            && !is_symbol(self.source[token_offset])
+        {
             while token_offset < self.source.len() {
                 if self.source[token_offset].is_ascii_whitespace()
                     || is_symbol(self.source[token_offset])
@@ -294,37 +325,38 @@ impl<'a> Lexer<'a> {
             self.span_offset += token_offset;
             let contents = &self.source[..token_offset];
             self.source = &self.source[token_offset..];
-    
+
             Some(Token {
                 token_type: TokenType::Variable,
                 contents,
                 span_start,
                 span_end: self.span_offset,
-            })    
+            })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'\'' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_single_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_single_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'"' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            Some(Token { token_type: TokenType::Dollar, span_start, span_end: self.span_offset, contents: &[b'$']})
+            Some(Token {
+                token_type: TokenType::Dollar,
+                span_start,
+                span_end: self.span_offset,
+                contents: &[b'$'],
+            })
         }
     }
 
@@ -677,6 +709,8 @@ impl<'a> Lexer<'a> {
     pub fn next(&mut self) -> Option<Token<'a>> {
         if self.source.is_empty() {
             None
+        } else if is_binary_literial(self.source) {
+            self.lex_binary_literial()
         } else if self.source[0].is_ascii_digit() {
             self.lex_number()
         } else if self.source[0] == b'"' {

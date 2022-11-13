@@ -6,7 +6,7 @@ TODO:
 
 - [x] Tables
 - [x] Units
-- [ ] Binary literals
+- [x] Binary literals
 - [x] Floats
 - [x] Hex, octal, binary integer values
 - [x] Ranges
