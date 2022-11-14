@@ -1,3 +1,5 @@
+# NOTE: this repo is frozen for now so that we can focus on the main Nushell parser.
+
 # Replacement for Nushell's parser
 
 This experiment hopes to grow to replace Nushell's current parser.
