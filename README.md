@@ -1,4 +1,4 @@
-# NOTE: this repo is frozen for now so that we can focus on the main Nushell parser.
+# NOTE: this repo is for an experimental Nushell parser
 
 # Replacement for Nushell's parser
 
