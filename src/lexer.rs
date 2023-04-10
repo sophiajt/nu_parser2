@@ -11,6 +11,7 @@ pub struct Lexer<'a> {
 #[derive(Debug)]
 pub enum TokenType {
     Number,
+    BinaryLiterial,
     Space,
     Newline,
     Comma,
@@ -68,6 +69,10 @@ fn is_symbol(b: u8) -> bool {
         b';', b'=', b'$', b'|', b'!', b'~', b'&', b'\'', b'"',
     ]
     .contains(&b)
+}
+
+fn is_binary_literial(source: &[u8]) -> bool {
+    source.len() > 2 && source[0] == b'0' && source[1] == b'b' && source[2] == b'['
 }
 
 impl<'a> Lexer<'a> {
@@ -275,6 +280,29 @@ impl<'a> Lexer<'a> {
             contents,
             span_start,
             span_end: span_start + 1,
+        })
+    }
+
+    pub fn lex_binary_literial(&mut self) -> Option<Token<'a>> {
+        let span_start = self.span_offset;
+
+        let mut token_offset = 3;
+        while token_offset < self.source.len() {
+            if self.source[token_offset] != b'0' && self.source[token_offset] != b'1' {
+                break;
+            }
+            token_offset += 1;
+        }
+        self.span_offset += token_offset;
+
+        let contents = &self.source[..token_offset];
+        self.source = &self.source[token_offset..];
+
+        Some(Token {
+            token_type: TokenType::BinaryLiterial,
+            contents,
+            span_start,
+            span_end: self.span_offset,
         })
     }
 
@@ -697,6 +725,8 @@ impl<'a> Lexer<'a> {
     pub fn next(&mut self) -> Option<Token<'a>> {
         if self.source.is_empty() {
             None
+        } else if is_binary_literial(self.source) {
+            self.lex_binary_literial()
         } else if self.source[0].is_ascii_digit() {
             self.lex_number()
         } else if self.source[0] == b'"' {
