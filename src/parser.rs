@@ -237,6 +237,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn skip_whitespace_and_comments(&mut self) {
+        self.lexer.skip_whitespace_and_comments()
+    }
+
     pub fn parse(&mut self) {
         self.program();
     }
@@ -596,10 +600,20 @@ impl<'a> Parser<'a> {
             let span_end = self.position();
             self.create_node(NodeType::Closure { params, block }, span_start, span_end)
         } else {
-            match self.lexer.peek_two_tokens() {
+            match self.lexer.peek_two_tokens_skip_whitespace() {
                 (
                     Some(Token {
                         token_type: TokenType::Bareword,
+                        ..
+                    }),
+                    Some(Token {
+                        token_type: TokenType::Colon,
+                        ..
+                    }),
+                )
+                | (
+                    Some(Token {
+                        token_type: TokenType::String,
                         ..
                     }),
                     Some(Token {
@@ -1956,29 +1970,6 @@ impl<'a> Parser<'a> {
             match self.lexer.peek() {
                 Some(Token {
                     token_type: TokenType::Space,
-                    ..
-                }) => {
-                    // keep going
-                    self.lexer.next();
-                }
-                _ => return,
-            }
-        }
-    }
-
-    pub fn skip_whitespace_and_comments(&mut self) {
-        loop {
-            match self.lexer.peek() {
-                Some(Token {
-                    token_type: TokenType::Space,
-                    ..
-                })
-                | Some(Token {
-                    token_type: TokenType::Newline,
-                    ..
-                })
-                | Some(Token {
-                    token_type: TokenType::Comment,
                     ..
                 }) => {
                     // keep going

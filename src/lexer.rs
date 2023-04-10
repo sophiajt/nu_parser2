@@ -282,7 +282,10 @@ impl<'a> Lexer<'a> {
         let span_start = self.span_offset;
 
         let mut token_offset = 1;
-        if self.source.len() > token_offset && !self.source[token_offset].is_ascii_whitespace() && !is_symbol(self.source[token_offset]) {
+        if self.source.len() > token_offset
+            && !self.source[token_offset].is_ascii_whitespace()
+            && !is_symbol(self.source[token_offset])
+        {
             while token_offset < self.source.len() {
                 if self.source[token_offset].is_ascii_whitespace()
                     || is_symbol(self.source[token_offset])
@@ -294,37 +297,38 @@ impl<'a> Lexer<'a> {
             self.span_offset += token_offset;
             let contents = &self.source[..token_offset];
             self.source = &self.source[token_offset..];
-    
+
             Some(Token {
                 token_type: TokenType::Variable,
                 contents,
                 span_start,
                 span_end: self.span_offset,
-            })    
+            })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'\'' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_single_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_single_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else if self.source.len() > token_offset && self.source[token_offset] == b'"' {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            self.lex_quoted_string().map(|x| {
-                Token {
-                    token_type: TokenType::Interpolation,
-                    span_start,
-                    ..x
-                }
+            self.lex_quoted_string().map(|x| Token {
+                token_type: TokenType::Interpolation,
+                span_start,
+                ..x
             })
         } else {
             self.span_offset += 1;
             self.source = &self.source[1..];
-            Some(Token { token_type: TokenType::Dollar, span_start, span_end: self.span_offset, contents: &[b'$']})
+            Some(Token {
+                token_type: TokenType::Dollar,
+                span_start,
+                span_end: self.span_offset,
+                contents: &[b'$'],
+            })
         }
     }
 
@@ -663,11 +667,27 @@ impl<'a> Lexer<'a> {
         output
     }
 
-    pub fn peek_two_tokens(&mut self) -> (Option<Token<'a>>, Option<Token<'a>>) {
+    // pub fn peek_two_tokens(&mut self) -> (Option<Token<'a>>, Option<Token<'a>>) {
+    //     let prev_offset = self.span_offset;
+    //     let prev_source = self.source;
+    //     let output1 = self.next();
+    //     let output2 = self.next();
+    //     self.span_offset = prev_offset;
+    //     self.source = prev_source;
+
+    //     (output1, output2)
+    // }
+
+    pub fn peek_two_tokens_skip_whitespace(&mut self) -> (Option<Token<'a>>, Option<Token<'a>>) {
         let prev_offset = self.span_offset;
         let prev_source = self.source;
+
+        self.skip_whitespace_and_comments();
         let output1 = self.next();
+
+        self.skip_whitespace_and_comments();
         let output2 = self.next();
+
         self.span_offset = prev_offset;
         self.source = prev_source;
 
@@ -701,6 +721,29 @@ impl<'a> Lexer<'a> {
             self.lex_comment()
         } else {
             self.lex_bareword()
+        }
+    }
+
+    pub fn skip_whitespace_and_comments(&mut self) {
+        loop {
+            match self.peek() {
+                Some(Token {
+                    token_type: TokenType::Space,
+                    ..
+                })
+                | Some(Token {
+                    token_type: TokenType::Newline,
+                    ..
+                })
+                | Some(Token {
+                    token_type: TokenType::Comment,
+                    ..
+                }) => {
+                    // keep going
+                    self.next();
+                }
+                _ => return,
+            }
         }
     }
 }
